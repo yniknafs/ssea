@@ -19,15 +19,22 @@ ext_modules = [Extension('ssea.lib.kernel',
                          sources=['ssea/lib/cfisher.pyx'], 
                          include_dirs=[numpy_inc])]
 
+extensions = [
+    Extension('ssea.lib.ckernel',
+              sources=['ssea/lib/ckernel.c', 'ssea/lib/rng.c'],
+              extra_compile_args=['-w'],
+              include_dirs=[numpy_inc]
+             )
+]
+
 setup(name='SSEA',
       description='Sample Set Enrichment Analysis',
       url='http://ssea.googlecode.com',
       author='matthew iyer, yashar niknafs',
       author_email='matthew.iyer@gmail.com',
       requires=['numpy', 'jinja2'],
-      ext_modules=cythonize(ext_modules),
-      packages={'ssea'},
+      ext_modules=cythonize(ext_modules) + extensions,
+      packages={'ssea', 'ssea.lib'},
       package_data={'ssea.templates': ['details.html',
                                        'report.html']},
-      scripts=['ssea/ssea', 
-               'ssea/report'])
+      scripts=['ssea/ssea'])
