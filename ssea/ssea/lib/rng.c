@@ -5,7 +5,7 @@
 #include <math.h>
 
 /* a.k.a. RAND_MAX */
-#define MODULUS 2147483647
+#define MODULUS ((1U << 31) - 1)
 
 /* seed generator using time */
 int lcg_init_state()
@@ -16,27 +16,23 @@ int lcg_init_state()
 }
 
 /* integer pseudo-random number based on seed */
-int lcg_rand(int seed)
+inline int lcg_rand(int seed)
 {
-    seed = (seed * 1103515245 + 12345) & MODULUS;
-    return(seed);
+    return (seed * 1103515245 + 12345) & MODULUS;
 }
 
 double lcg_double(int *seedp)
 {
-    int seed;
-    seed = lcg_rand(*seedp);
+    int seed = lcg_rand(*seedp);
     *seedp = seed;
     return(((double) seed) / MODULUS);
 }
 
 int lcg_range(int *seedp, const int a, const int b)
 {
-    int seed;
-    double x;
-    seed = lcg_rand(*seedp);
+    int seed = lcg_rand(*seedp);
     *seedp = seed;
-    x = ((double) seed) / ((unsigned int) MODULUS + 1);
+    double x = ((double) seed) / ((unsigned int) MODULUS + 1);
     return(a + (int)((b - a + 1) * x));
 }
 
@@ -90,12 +86,11 @@ static double loggam(double x)
 /* adapted from numpy.random source code */
 long lcg_poisson_mult(int *seedp, const double lam)
 {
-    long X;
-    double prod, U, enlam;
+    long X = 0;
+    double enlam = exp(-lam);
+    double prod = 1.0;
+    double U;
 
-    enlam = exp(-lam);
-    X = 0;
-    prod = 1.0;
     while (1)
     {
         U = lcg_double(seedp);

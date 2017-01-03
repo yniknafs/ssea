@@ -4,6 +4,8 @@
 
 #include "rng.h"
 
+long* base_norm_counts;
+
 static PyObject* py_normalize_counts(PyObject* self, PyObject* args) {
 
     PyObject* counts_numpy_array;
@@ -206,11 +208,38 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
     return Py_BuildValue("(f,I,O)", 0.0, 0, es_run_numpy_array); 
 }
 
+static int argsort_compare(const void* a, const void* b) {
+    int aa = *((int *)a);
+    int bb = *((int *)b);
+
+    if (arr[aa] < arr[bb]) {
+        return 1;
+    } else if (arr[aa] == arr[bb]) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+static PyObject* py_argsort(PyObject* self, PyObject* args) {
+    PyObject* norm_counts_numpy_array;
+    PyObject* ranks_numpy_array;
+    int array_len;
+
+    if (!PyArg_ParseTuple(args, "OIO", &norm_counts_numpy_array, &array_len, &ranks_numpy_array)) {
+        return NULL;
+    }
+
+    long* ranks = PyArray_DATA(ranks_numpy_array);
+
+    qsort();
+}
+
 static PyMethodDef CCkernelMethods[] = {
     {"c_normalize_counts", py_normalize_counts, METH_VARARGS},
     {"c_power_transform", py_power_transform, METH_VARARGS},
     {"c_shufflei", py_shufflei, METH_VARARGS},
     {"c_random_walk", py_random_walk, METH_VARARGS},
+    {"c_argsort", py_argsort, METH_VARARGS},
     {NULL, NULL}
 };
 

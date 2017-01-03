@@ -15,7 +15,7 @@ cimport rng
 from libc.math cimport log2, fabs
 
 # C kernel import
-from ckernel import c_normalize_counts, c_power_transform, c_shufflei, c_random_walk
+from ckernel import c_normalize_counts, c_argsort, c_power_transform, c_shufflei, c_random_walk
 
 # define power transform methods
 DEF UNWEIGHTED = 0
@@ -258,7 +258,10 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
     '''
 
     # rank order the N samples in D to form L={s1...sn}
-    ranks = np.copy(np.argsort(norm_counts)[::-1])
+    ranks = np.copy(membership)
+    c_argsort(norm_counts, norm_counts.shape[0], ranks)
+
+    #ranks = np.copy(np.argsort(norm_counts)[::-1])
     perm = np.arange(nsamples)
 
     if permute_samples:
