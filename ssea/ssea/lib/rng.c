@@ -112,22 +112,19 @@ long lcg_poisson_mult(int *seedp, const double lam)
 #define TWELFTH 0.083333333333333333333333
 long lcg_poisson_ptrs(int *seedp, const double lam)
 {
-    long k;
-    double U, V, slam, loglam, a, b, invalpha, vr, us;
-
-    slam = sqrt(lam);
-    loglam = log(lam);
-    b = 0.931 + 2.53*slam;
-    a = -0.059 + 0.02483*b;
-    invalpha = 1.1239 + 1.1328/(b-3.4);
-    vr = 0.9277 - 3.6224/(b-2);
+    const double slam = sqrt(lam);
+    const double loglam = log(lam);
+    const double b = 0.931 + 2.53*slam;
+    const double a = -0.059 + 0.02483*b;
+    const double invalpha = 1.1239 + 1.1328/(b-3.4);
+    const double vr = 0.9277 - 3.6224/(b-2);
 
     while (1)
     {
-        U = lcg_double(seedp) - 0.5;
-        V = lcg_double(seedp);
-        us = 0.5 - fabs(U);
-        k = (long)floor((2*a/us + b)*U + lam + 0.43);
+        const double U = lcg_double(seedp) - 0.5;
+        const double V = lcg_double(seedp);
+        const double us = 0.5 - fabs(U);
+        const long k = (long)floor((2*a/us + b)*U + lam + 0.43);
         if ((us >= 0.07) && (V <= vr))
         {
             return k;

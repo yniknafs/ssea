@@ -258,10 +258,11 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
     '''
 
     # rank order the N samples in D to form L={s1...sn}
-    ranks = np.copy(membership)
-    c_argsort(norm_counts, norm_counts.shape[0], ranks)
+    #ranks = np.arange(nsamples)
+    #c_argsort(norm_counts, norm_counts.shape[0], ranks)
 
-    #ranks = np.copy(np.argsort(norm_counts)[::-1])
+    # This is faster than the "qsort" C implementation
+    ranks = np.copy(np.argsort(norm_counts)[::-1])
     perm = np.arange(nsamples)
 
     if permute_samples:

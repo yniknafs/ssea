@@ -208,18 +208,19 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
     return Py_BuildValue("(f,I,O)", 0.0, 0, es_run_numpy_array); 
 }
 
-static int argsort_compare(const void* a, const void* b) {
-    int aa = *((int *)a);
-    int bb = *((int *)b);
+static int reverse_argsort_compare(const void* a, const void* b) {
+    const long aa = *((long *)a);
+    const long bb = *((long *)b);
 
-    if (arr[aa] < arr[bb]) {
+    if (base_norm_counts[aa] < base_norm_counts[bb]) {
         return 1;
-    } else if (arr[aa] == arr[bb]) {
+    } else if (base_norm_counts[aa] == base_norm_counts[bb]) {
         return 0;
     } else {
         return -1;
     }
 }
+
 static PyObject* py_argsort(PyObject* self, PyObject* args) {
     PyObject* norm_counts_numpy_array;
     PyObject* ranks_numpy_array;
@@ -229,9 +230,13 @@ static PyObject* py_argsort(PyObject* self, PyObject* args) {
         return NULL;
     }
 
+    long* norm_counts = PyArray_DATA(norm_counts_numpy_array);
     long* ranks = PyArray_DATA(ranks_numpy_array);
 
-    qsort();
+    base_norm_counts = norm_counts;
+    qsort(ranks, array_len, sizeof(long), reverse_argsort_compare);
+
+    return Py_BuildValue("O", ranks_numpy_array);
 }
 
 static PyMethodDef CCkernelMethods[] = {
@@ -242,9 +247,6 @@ static PyMethodDef CCkernelMethods[] = {
     {"c_argsort", py_argsort, METH_VARARGS},
     {NULL, NULL}
 };
-
-// potentially make a smaller, faster version that doesn't requrie the norm_counts_miss/ norm_counts_hit array
-// to be returned -- BE CARE FUL this is required in the report code
 
 PyMODINIT_FUNC
 initckernel(void)

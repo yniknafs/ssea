@@ -239,7 +239,7 @@ def ssea_serial(config, sample_set, output_basename,
     hists = _init_hists()
     # setup report file
     unsorted_json_file = output_basename + JSON_UNSORTED_SUFFIX
-    outfileh = open(unsorted_json_file, 'wb')    
+    outfileh = open(unsorted_json_file, 'wb')
     for i in xrange(startrow, endrow):
         logging.debug("\tRow: %d (%d-%d)" % (i, startrow, endrow))
         # read from memmap
