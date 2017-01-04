@@ -1,0 +1,104 @@
+#!/bin/env python
+# encoding: utf-8
+import Tkinter as tk
+from Tkinter import *
+from tkFileDialog import askdirectory, askopenfilename
+
+import os
+import multiprocessing
+import subprocess
+
+class Application(tk.Frame):
+    def __init__(self, master=None):
+        tk.Frame.__init__(self, master)
+        self.grid()  
+        self.createWidgets()
+
+    def run_button_callback(self):
+        sm_filename, sm_file_extension = os.path.splitext(self.sm_filesFolder.get())
+        subprocess.call(["ssea",
+                         "-o", os.path.join(self.outputFolder.get(), "ssea_output"),
+                         "-p", self.numCores.get(),
+                         "--" + str(sm_file_extension[1:]), self.sm_filesFolder.get(),
+                         "--perms", self.perms.get(),
+                         "--matrix", self.matrixFolder.get()])
+
+
+    def browse_for_output_folder(self):
+        self.outputFolder.delete(0, tk.END)
+        self.outputFolder.insert(0, askdirectory())
+
+    def browse_for_sm_file(self):
+        self.sm_filesFolder.delete(0, tk.END)
+        self.sm_filesFolder.insert(0, askopenfilename(filetypes=[('SMT Files', '.smt'), ('SMX Files', '.smx')]))
+
+    def browse_for_matrix_folder(self):
+        self.matrixFolder.delete(0, tk.END)
+        self.matrixFolder.insert(0, askdirectory())
+
+    def clear_button_callback(self):
+        self.outputFolder.delete(0, tk.END)
+        self.numCores.delete(0, tk.END)
+        self.sm_filesFolder.delete(0, tk.END)
+        self.perms.delete(0, tk.END)
+        self.matrixFolder.delete(0, tk.END)
+
+    def createWidgets(self):
+        self.welcomeLabel = tk.Label(self, text="SSEA Analysis Tool", font=("Helvetica", 26))
+        self.welcomeLabel.grid(row=0)
+
+        # output directory
+        self.outputFolderText = tk.Label(self, text="Output Folder")
+        self.outputFolderText.grid(row=1, column=0)
+        self.outputFolderButton = tk.Button(self, text="select", command=self.browse_for_output_folder)
+        self.outputFolderButton.grid(row=1, column=1)
+        self.outputFolder = tk.Entry(self)
+        self.outputFolder.grid(row=1, column=2)
+
+        # num cores
+        self.numCoresText = tk.Label(self, text="Number of cores to use")
+        self.numCoresText.grid(row=2, column=0)
+        self.numCoresDetectedText = tk.Label(self, text="[1 - " + str(multiprocessing.cpu_count()) + "]")
+        self.numCoresDetectedText.grid(row=2, column=1)
+        self.numCores = tk.Entry(self)
+        self.numCores.grid(row=2, column=2)
+
+        # SMT/SMX files
+        self.sm_files_text = tk.Label(self, text="SMT/SMX File")
+        self.sm_files_text.grid(row=3, column=0)
+        self.sm_filesButton = tk.Button(self, text="select", command=self.browse_for_sm_file)
+        self.sm_filesButton.grid(row=3, column=1)
+        self.sm_filesFolder = tk.Entry(self)
+        self.sm_filesFolder.grid(row=3, column=2)
+
+        # permutations
+        self.perms_text = tk.Label(self, text="Permutations")
+        self.perms_text.grid(row=4, column=0)
+        self.perms_textHelper = tk.Label(self, text="[1-1000]")
+        self.perms_textHelper.grid(row=4, column=1)
+        self.perms = tk.Entry(self)
+        self.perms.grid(row=4, column=2)
+
+        # matrix
+        self.matrix_text = tk.Label(self, text="Matrix Location")
+        self.matrix_text.grid(row=5, column=0)
+        self.matrix_textButton = tk.Button(self, text="select", command=self.browse_for_matrix_folder)
+        self.matrix_textButton.grid(row=5, column=1)
+        self.matrixFolder = tk.Entry(self)
+        self.matrixFolder.grid(row=5, column=2)
+
+
+        self.runButton = tk.Button(self, text='Run', command=self.run_button_callback)
+        self.runButton.grid(row=6, column=0)
+
+        self.clearButton = tk.Button(self, text='Clear', command=self.clear_button_callback)
+        self.clearButton.grid(row=6, column=1)        
+
+        self.quitButton = tk.Button(self, text='Quit', command=self.quit)
+        self.quitButton.grid(row=6, column=2)
+
+
+app = Application()
+app.master.geometry('{}x{}'.format(600,300))
+app.master.title('SSEA GUI')
+app.mainloop()

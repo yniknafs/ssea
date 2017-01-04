@@ -29,5 +29,4 @@ setup(name='SSEA',
       packages={'ssea'},
       package_data={'ssea.templates': ['details.html',
                                        'report.html']},
-      scripts=['ssea/ssea', 
-               'ssea/report'])
+      scripts=['ssea/ssea', 'ssea/ssea_gui'])
