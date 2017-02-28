@@ -5,39 +5,35 @@
 #include <math.h>
 
 /* a.k.a. RAND_MAX */
-#define MODULUS 2147483647
+#define MODULUS ((1U << 31) - 1)
 
 /* seed generator using time */
 int lcg_init_state()
 {
-	int x;
-	x = ((int) time((time_t *) NULL)) % MODULUS;
-	return(x);
+    int x;
+    x = ((int) time((time_t *) NULL)) % MODULUS;
+    return(x);
 }
 
 /* integer pseudo-random number based on seed */
-int lcg_rand(int seed)
+inline int lcg_rand(int seed)
 {
-	seed = (seed * 1103515245 + 12345) & MODULUS;
-	return(seed);
+    return (seed * 1103515245 + 12345) & MODULUS;
 }
 
 double lcg_double(int *seedp)
 {
-	int seed;
-	seed = lcg_rand(*seedp);
-	*seedp = seed;
-	return(((double) seed) / MODULUS);
+    int seed = lcg_rand(*seedp);
+    *seedp = seed;
+    return(((double) seed) / MODULUS);
 }
 
-int lcg_range(int *seedp, int a, int b)
+int lcg_range(int *seedp, const int a, const int b)
 {
-	int seed;
-	double x;
-	seed = lcg_rand(*seedp);
-	*seedp = seed;
-	x = ((double) seed) / ((unsigned int) MODULUS + 1);
-	return(a + (int)((b - a + 1) * x));
+    int seed = lcg_rand(*seedp);
+    *seedp = seed;
+    double x = ((double) seed) / ((unsigned int) MODULUS + 1);
+    return(a + (int)((b - a + 1) * x));
 }
 
 /*
@@ -88,17 +84,16 @@ static double loggam(double x)
 }
 
 /* adapted from numpy.random source code */
-long lcg_poisson_mult(int *seedp, double lam)
+long lcg_poisson_mult(int *seedp, const double lam)
 {
-	long X;
-	double prod, U, enlam;
+    long X = 0;
+    double enlam = exp(-lam);
+    double prod = 1.0;
+    double U;
 
-    enlam = exp(-lam);
-    X = 0;
-    prod = 1.0;
     while (1)
     {
-    	U = lcg_double(seedp);
+        U = lcg_double(seedp);
         prod *= U;
         if (prod > enlam)
         {
@@ -106,7 +101,7 @@ long lcg_poisson_mult(int *seedp, double lam)
         }
         else
         {
-        	/* update seed before returning */
+            /* update seed before returning */
             return X;
         }
     }
@@ -115,24 +110,21 @@ long lcg_poisson_mult(int *seedp, double lam)
 /* adapted from numpy.random source code */
 #define LS2PI 0.91893853320467267
 #define TWELFTH 0.083333333333333333333333
-long lcg_poisson_ptrs(int *seedp, double lam)
+long lcg_poisson_ptrs(int *seedp, const double lam)
 {
-    long k;
-    double U, V, slam, loglam, a, b, invalpha, vr, us;
-
-    slam = sqrt(lam);
-    loglam = log(lam);
-    b = 0.931 + 2.53*slam;
-    a = -0.059 + 0.02483*b;
-    invalpha = 1.1239 + 1.1328/(b-3.4);
-    vr = 0.9277 - 3.6224/(b-2);
+    const double slam = sqrt(lam);
+    const double loglam = log(lam);
+    const double b = 0.931 + 2.53*slam;
+    const double a = -0.059 + 0.02483*b;
+    const double invalpha = 1.1239 + 1.1328/(b-3.4);
+    const double vr = 0.9277 - 3.6224/(b-2);
 
     while (1)
     {
-    	U = lcg_double(seedp) - 0.5;
-    	V = lcg_double(seedp);
-        us = 0.5 - fabs(U);
-        k = (long)floor((2*a/us + b)*U + lam + 0.43);
+        const double U = lcg_double(seedp) - 0.5;
+        const double V = lcg_double(seedp);
+        const double us = 0.5 - fabs(U);
+        const long k = (long)floor((2*a/us + b)*U + lam + 0.43);
         if ((us >= 0.07) && (V <= vr))
         {
             return k;
@@ -151,7 +143,7 @@ long lcg_poisson_ptrs(int *seedp, double lam)
 }
 
 /* adapted from numpy.random source code */
-long lcg_poisson(int *seedp, double lam)
+long lcg_poisson(int *seedp, const double lam)
 {
     if (lam >= 10)
     {
@@ -169,16 +161,16 @@ long lcg_poisson(int *seedp, double lam)
 
 double lcg_gauss(int *seedp)
 {
-	double f, x1, x2, r2;
-	do {
-		x1 = 2.0*lcg_double(seedp) - 1.0;
-		x2 = 2.0*lcg_double(seedp) - 1.0;
-		r2 = x1*x1 + x2*x2;
+    double f, x1, x2, r2;
+    do {
+        x1 = 2.0*lcg_double(seedp) - 1.0;
+        x2 = 2.0*lcg_double(seedp) - 1.0;
+        r2 = x1*x1 + x2*x2;
     }
-	while (r2 >= 1.0 || r2 == 0.0);
-	/* Box-Muller transform */
-	f = sqrt(-2.0*log(r2)/r2);
-	return f*x2;
+    while (r2 >= 1.0 || r2 == 0.0);
+    /* Box-Muller transform */
+    f = sqrt(-2.0*log(r2)/r2);
+    return f*x2;
 }
 
 double lcg_normal(int *seedp, double loc, double scale)
@@ -193,21 +185,21 @@ double lcg_uniform(int *seedp, double loc, double scale)
 
 int main()
 {
-	int i;
-	double d;
-	int seed;
+    int i;
+    double d;
+    int seed;
 
-	seed = lcg_init_state();
-	printf("seed is %d", seed);
+    seed = lcg_init_state();
+    printf("seed is %d", seed);
 
-	for (i = 0; i < 100; i++) {
-		seed = lcg_rand(seed);
-		d = lcg_poisson(&seed, 30);
-		/* d = ((double) seed) / MODULUS; */
-		printf("poisson %d %f\n", seed, d);
-		d = lcg_normal(&seed, 50, 2);
-		printf("normal %d %f\n", seed, d);
-	}
+    for (i = 0; i < 100; i++) {
+        seed = lcg_rand(seed);
+        d = lcg_poisson(&seed, 30);
+        /* d = ((double) seed) / MODULUS; */
+        printf("poisson %d %f\n", seed, d);
+        d = lcg_normal(&seed, 50, 2);
+        printf("normal %d %f\n", seed, d);
+    }
  
-	return 0;
+    return 0;
 } 
