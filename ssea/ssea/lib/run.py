@@ -4,8 +4,9 @@ SSEA: Sample Set Enrichment Analysis
 import os
 import argparse
 import logging
+import pickle
 
-from base import WEIGHT_METHODS
+from base import WEIGHT_METHODS, ParserError, SampleSet
 from countdata import CountMatrix
 
 
@@ -88,9 +89,9 @@ class Args:
                          	default=Args.NOISE_SCALE,
                          	help='noise parameter (advanced)'
                          	'[default=%(default)s]')
-        parser.add_argument('-s', '--sample-sets', required=True,
+        parser.add_argument('-s', '--sample-set', required=True,
                             dest='sample_set_file',
-                            help='File containing sample sets')
+                            help='File containing sample set')
         parser.add_argument('-c', '--count-matrix', required=True,
                             dest='count_matrix_path',
                             help='Path to count matrix')
@@ -119,8 +120,8 @@ class Args:
         func(fmt.format('weight_param:', str(args.weight_param)))
         func(fmt.format('noise_loc:', str(args.noise_loc)))
         func(fmt.format('noise_scale:', str(args.noise_scale)))
-        func(fmt.format('sample_sets:', str(args.sample_set_file)))
-        func(fmt.format('count_matrix:', str(args.count_matrix_path)))
+        func(fmt.format('sample_set_file:', str(args.sample_set_file)))
+        func(fmt.format('count_matrix_path:', str(args.count_matrix_path)))
 
     @staticmethod
     def parse():
@@ -158,13 +159,15 @@ class Args:
 
 class Results(object):
     TMP_DIR = 'tmp'
+    LOG_DIR = 'log'
     STATUS_FILE = 'status.json'
     ARGS_FILE = 'args.pickle'
-    SAMPLE_SET_FILE = 'sample_sets.tsv'
+    SAMPLE_SET_FILE = 'sample_set.json'
 
     def __init__(self, output_dir):
         self.output_dir = output_dir
         self.tmp_dir = os.path.join(output_dir, Results.TMP_DIR)
+        self.log_dir = os.path.join(output_dir, Results.LOG_DIR)
         self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
         self.sample_set_file = os.path.join(output_dir, Results.SAMPLE_SET_FILE)
 
@@ -179,6 +182,9 @@ class Run(object):
         self = Run()
         # parse command line args
         args = Args.parse()
+        self.args = args
+        self.results = Results(args.output_dir)
+
         # setup logging
         if args.verbose:
             level = logging.DEBUG
@@ -187,9 +193,26 @@ class Run(object):
         logging.basicConfig(level=level,
                             format="%(asctime)s pid=%(process)d "
                                    "%(levelname)s - %(message)s")
+        # open count matrix
+        cm = CountMatrix.open(args.count_matrix_path)
+        shape = cm.shape
 
-        self.args = args
-        self.results = Results(args.output_dir)
+        # open sample sets
+        logging.info("Reading sample set")
+        sample_set = SampleSet.parse_smt(args.sample_set_file)[0]
+        # ensure every sample found in count matrix
+        if not set(sample_set.value_dict).issubset(cm.colnames):
+            raise ParserError('samples in sample set do not match sample '
+                              'names in count matrix')
+        # sample sets must have at least one hit and one miss
+        if len(sample_set) < 2:
+            raise ParserError("sample set size <2")
+        nhits = sum(x == 1 for x in sample_set.value_dict.itervalues())
+        nmisses = sum(x == 0 for x in sample_set.value_dict.itervalues())
+        if nhits < 1 or nmisses < 1:
+            raise ParserError("sample set invalid")
+        logging.debug("Sample set %s size %d" %
+                      (sample_set.name, len(sample_set)))
 
         # create output directories
         results = self.results
@@ -200,79 +223,14 @@ class Run(object):
         if not os.path.exists(results.tmp_dir):
             logging.debug("Creating tmp directory '%s'" % (results.tmp_dir))
             os.makedirs(results.tmp_dir)
+        if not os.path.exists(results.log_dir):
+            logging.debug("Creating log directory '%s'" % (results.log_dir))
+            os.makedirs(results.log_dir)
 
-        # open count matrix
-        cm = CountMatrix.open(args.count_matrix_path)
-        if cm.size_factors is None:
-            parser.error('No size factors found in count matrix')
-        shape = cm.shape
-        cm.close()
+        # write command line args
+        Args.dump(args, results.args_file)
+        # write sample set file
+        with open(results.sample_set_file, 'w') as fp:
+            print >>fp, sample_set.to_json()
 
         return self
-
-        # open sample sets
-        sample_sets = read_sample_sets(config)
-        # read current file if exists
-        sample_set_info_file = os.path.join(config.output_dir,
-                                            Config.SAMPLE_SET_INFO_FILE)
-        ss_infos = []
-        ss_names = set()
-        max_ss_id = 0
-        if os.path.exists(sample_set_info_file):
-            for ss_info in read_sample_set_info(sample_set_info_file):
-                ss_infos.append(ss_info)
-                ss_names.add(ss_info.name)
-                max_ss_id = max(max_ss_id, ss_info.id)
-        # read new sample sets
-        for sample_set in sample_sets:
-            logging.info("Sample Set: %s" % (sample_set.name))
-            if sample_set.name in ss_names:
-                logging.warning('Sample Set "%s" already exists in output '
-                                'directory' % (sample_set.name))
-                continue
-            # create sample set directory
-            ss_id = (max_ss_id + 1)
-            sample_set_dirname = 'ss_%d' % (ss_id)
-            sample_set_path = os.path.join(config.output_dir, sample_set_dirname)
-            assert not os.path.exists(sample_set_path)
-            max_ss_id += 1
-            if not os.path.exists(sample_set_path):
-                logging.debug("Creating sample set directory '%s'" % (sample_set_path))
-                os.makedirs(sample_set_path)
-            # create temp directory
-            tmp_dir = os.path.join(sample_set_path, Config.TMP_DIR)
-            if not os.path.exists(tmp_dir):
-                logging.debug("Creating tmp directory '%s'" % (tmp_dir))
-                os.makedirs(tmp_dir)
-            # create log directory
-            log_dir = os.path.join(sample_set_path, Config.LOG_DIR)
-            if not os.path.exists(log_dir):
-                logging.debug("Creating log directory '%s'" % (log_dir))
-                os.makedirs(log_dir)
-            # write configuration file
-            logging.debug("Writing configuration file")
-            config_file = os.path.join(sample_set_path, Config.CONFIG_JSON_FILE)
-            with open(config_file, 'w') as fp:
-                print >>fp, config.to_json()
-            # write sample set file
-            logging.debug("Writing sample set file")
-            sample_set_file = os.path.join(sample_set_path, Config.SAMPLE_SET_JSON_FILE)
-            with open(sample_set_file, 'w') as fp:
-                print >>fp, sample_set.to_json()
-            # map work into chunks
-            worker_file = os.path.join(sample_set_path, WORKER_FILE)
-            write_worker_info(worker_file,
-                              num_jobs=shape[0],
-                              num_processes=config.num_processes)
-            # add to sample set info list
-            ss_info = SSInfo(id=ss_id,
-                             dirname=sample_set_dirname,
-                             name=sample_set.name,
-                             desc=sample_set.desc,
-                             size=len(sample_set))
-            ss_infos.append(ss_info)
-            # mark job status as ready
-            JobStatus.set(sample_set_path, JobStatus.READY)
-        # write sample set info list
-        write_sample_set_info(ss_infos, sample_set_info_file)
-        return 0

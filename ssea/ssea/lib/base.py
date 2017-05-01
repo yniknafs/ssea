@@ -15,6 +15,7 @@ INT_DTYPE = np.int
 FLOAT_DTYPE = np.float
 MISSING_VALUE = -1
 
+
 class WeightMethod:
     UNWEIGHTED = 0
     WEIGHTED = 1
@@ -26,11 +27,13 @@ WEIGHT_METHODS = {'unweighted': WeightMethod.UNWEIGHTED,
                   'log': WeightMethod.LOG}
 WEIGHT_METHOD_STR = dict((v,k) for k,v in WEIGHT_METHODS.iteritems())
 
+
 class NumpyJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
 
 def quantile_sorted(a, frac):
     def _interpolate(a, b, fraction):
@@ -41,6 +44,7 @@ def quantile_sorted(a, frac):
     else:
         score = _interpolate(a[int(idx)], a[int(idx) + 1], idx % 1)
     return score
+
 
 def quantile(a, frac, limit=(), interpolation_method='fraction'):
     '''copied verbatim from scipy code (scipy.org)'''
@@ -66,6 +70,7 @@ def quantile(a, frac, limit=(), interpolation_method='fraction'):
                              "'lower' or 'higher'")
     return score
 
+
 def interp(x, xp, yp):
     '''
     linear interpolation
@@ -84,6 +89,7 @@ def interp(x, xp, yp):
     y = yp[a] + (yp[b] - yp[a]) * frac
     return y
 
+
 def hist_quantile(hist, bins, frac, left=None, right=None):
     assert frac >= 0.0
     assert frac <= 1.0
@@ -91,11 +97,12 @@ def hist_quantile(hist, bins, frac, left=None, right=None):
     hist_norm[1:] = (hist.cumsum() / float(hist.sum()))
     return np.interp(frac, hist_norm, bins, left, right)
 
+
 def chunk(n, nchunks):
     '''
     divide the integer 'n' into 'nchunks' equal sized ranges
     '''
-    chunk_size, remainder = divmod(n, nchunks)            
+    chunk_size, remainder = divmod(n, nchunks)
     start = 0
     while True:
         end = start + chunk_size
@@ -108,6 +115,7 @@ def chunk(n, nchunks):
         start = end
     assert end == n
 
+
 def computerize_name(s):
     # lower case and remove trailing whitespace
     s = s.lower().strip()
@@ -119,6 +127,7 @@ def computerize_name(s):
     # remove leading and trailing underscores
     s = s.strip('_')
     return s
+
 
 class JobStatus:
     DONE = 'job.done'
@@ -138,10 +147,11 @@ class JobStatus:
     @staticmethod
     def get(path):
         if os.path.exists(os.path.join(path, JobStatus.DONE)):
-            return JobStatus.DONE 
+            return JobStatus.DONE
         elif os.path.exists(os.path.join(path, JobStatus.BUSY)):
             return JobStatus.BUSY
-        return JobStatus.READY 
+        return JobStatus.READY
+
 
 class ParserError(Exception):
     '''Error parsing a file.'''
@@ -153,38 +163,39 @@ class ParserError(Exception):
     def __unicode__(self):
         return self.msg
 
-class SampleSet(object): 
+
+class SampleSet(object):
     DTYPE = np.int
     MISSING_VALUE = -1
-    
+
     def __init__(self, name=None, desc=None, values=None):
         '''
         name: string name of sample set
-        desc: string description of sample set 
-        values: list of tuples of (sample_name,0 or 1) for 
+        desc: string description of sample set
+        values: list of tuples of (sample_name,0 or 1) for
         valid samples in this set
         '''
         self.name = name
         self.desc = desc
         self.value_dict = {}
         if values is not None:
-            for sample,value in values:
+            for sample, value in values:
                 value = int(value)
                 assert (value == 0) or (value == 1)
                 self.value_dict[sample] = value
 
     def __repr__(self):
-        return ("<%s(name=%s,desc=%s,value_dict=%s" % 
+        return ("<%s(name=%s,desc=%s,value_dict=%s" %
                 (self.__class__.__name__, self.name, self.desc,
                  str(self.value_dict)))
-        
+
     def __len__(self):
-        return sum(self.value_dict.itervalues())
-    
+        return len(self.value_dict)
+
     def get_array(self, samples):
-        return np.array([self.value_dict.get(x, SampleSet.MISSING_VALUE) 
+        return np.array([self.value_dict.get(x, SampleSet.MISSING_VALUE)
                          for x in samples], dtype=SampleSet.DTYPE)
-    
+
     def to_json(self):
         d = {'name': self.name,
              'desc': self.desc,
@@ -201,7 +212,7 @@ class SampleSet(object):
     def from_json(s):
         d = json.loads(s)
         return SampleSet(**d)
-       
+
     @staticmethod
     def parse_json(filename):
         sample_sets = []
@@ -209,7 +220,7 @@ class SampleSet(object):
             for line in f:
                 sample_sets.append(SampleSet.from_json(line.strip()))
         return sample_sets
-    
+
     @staticmethod
     def parse_smx(filename, sep='\t'):
         '''
@@ -236,7 +247,9 @@ class SampleSet(object):
                 if not value:
                     continue
                 value = int(value)
-                sample_sets[i].value_dict[sample] = value
+                assert value in set((1, 0, -1))
+                if value == 0 or value ==1:
+                    sample_sets[i].value_dict[sample] = value
             lineno += 1
         fileh.close()
         return sample_sets
@@ -259,14 +272,17 @@ class SampleSet(object):
                 if not value:
                     continue
                 value = int(value)
-                values.append((samples[i],value))
+                assert value in set((1, 0, -1))
+                if value == 0 or value ==1:
+                    values.append((samples[i],value))
             sample_sets.append(SampleSet(name, desc, values))
         fileh.close()
         return sample_sets
 
+
 class Metadata(object):
     __slots__ = ('_id', 'name', 'params')
-    
+
     def __init__(self, _id=None, name=None, params=None):
         '''
         _id: unique integer id
@@ -280,8 +296,8 @@ class Metadata(object):
             self.params.update(params)
 
     def __repr__(self):
-        return ("<%s(_id=%d,name=%s,params=%s>" % 
-                (self.__class__.__name__, self._id, self.name, 
+        return ("<%s(_id=%d,name=%s,params=%s>" %
+                (self.__class__.__name__, self._id, self.name,
                  self.params))
     def __eq__(self, other):
         return self._id == other._id
@@ -295,7 +311,7 @@ class Metadata(object):
         d.update({'_id': self._id,
                   'name': self.name})
         return json.dumps(d)
-    
+
     @staticmethod
     def from_json(s):
         d = json.loads(s)
@@ -304,7 +320,7 @@ class Metadata(object):
         m.name = d.pop('name')
         m.params = d
         return m
-    
+
     @staticmethod
     def from_dict(d):
         m = Metadata()
@@ -312,7 +328,7 @@ class Metadata(object):
         m.name = d.pop('name')
         m.params = d
         return m
-    
+
     @staticmethod
     def parse_json(filename):
         with open(filename, 'r') as fp:
@@ -322,7 +338,7 @@ class Metadata(object):
     @staticmethod
     def parse_tsv(filename, names, id_iter=None):
         '''
-        parse tab-delimited file containing sample information        
+        parse tab-delimited file containing sample information
         first row contains column headers
         first column must contain sample name
         remaining columns contain metadata
@@ -335,7 +351,7 @@ class Metadata(object):
             header_fields = fileh.next().strip().split('\t')[1:]
             for line in fileh:
                 fields = line.strip().split('\t')
-                name = fields[0]            
+                name = fields[0]
                 metadict[name] = fields[1:]
         # join with names
         for name in names:
@@ -344,24 +360,24 @@ class Metadata(object):
             assert name in metadict
             fields = metadict[name]
             metadata = dict(zip(header_fields,fields))
-            yield Metadata(id_iter.next(), name, metadata)  
+            yield Metadata(id_iter.next(), name, metadata)
 
 class Result(object):
     MAX_POINTS = 100
     FIELDS = ('t_id', 'rand_seed', 'es', 'es_rank', 'nominal_p_value',
               'core_hits', 'core_misses', 'null_hits', 'null_misses',
-              'fisher_p_value', 'odds_ratio', 'nes', 'ss_fdr_q_value', 
-              'ss_rank', 'ss_percentile', 'resample_es_vals', 
-              'resample_es_ranks', 'null_es_vals', 'null_es_ranks', 
+              'fisher_p_value', 'odds_ratio', 'nes', 'ss_fdr_q_value',
+              'ss_rank', 'ss_percentile', 'resample_es_vals',
+              'resample_es_ranks', 'null_es_vals', 'null_es_ranks',
               'null_es_mean')
-    
+
     def __init__(self):
         for x in Result.FIELDS:
             setattr(self, x, None)
-    
-    def to_json(self): 
+
+    def to_json(self):
         return json.dumps(self.__dict__, cls=NumpyJSONEncoder)
-    
+
     @staticmethod
     def from_json(s):
         d = json.loads(s)
