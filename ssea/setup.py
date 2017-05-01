@@ -1,22 +1,30 @@
 '''
-Created on Oct 9, 2013
-
-@author: mkiyer
+SSEA: Sample Set Enrichment Analysis
 '''
+import os
 from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Build import cythonize
 
-#from distutils.sysconfig import get_python_inc, get_python_lib
 import numpy
 numpy_inc = numpy.get_include()
 
-ext_modules = [Extension('ssea.lib.kernel', 
-                         sources=['ssea/lib/kernel.pyx', 'ssea/lib/rng.c'], 
+__author__ = "Matthew Iyer, Yashar Niknafs"
+__copyright__ = "Copyright 2012-2017"
+__credits__ = ["Matthew Iyer", "Yashar Niknafs"]
+__license__ = "GPL"
+__version__ = "0.1.0"
+__maintainer__ = "Yashar Niknafs"
+__email__ = "yniknafs@umich.edu"
+__status__ = "Development"
+
+
+ext_modules = [Extension('ssea.lib.kernel',
+                         sources=['ssea/lib/kernel.pyx', 'ssea/lib/rng.c'],
                          include_dirs=[numpy_inc],
                          libraries=['m']),
-               Extension('ssea.lib.cfisher', 
-                         sources=['ssea/lib/cfisher.pyx'], 
+               Extension('ssea.lib.cfisher',
+                         sources=['ssea/lib/cfisher.pyx'],
                          include_dirs=[numpy_inc])]
 
 extensions = [
@@ -27,14 +35,20 @@ extensions = [
              )
 ]
 
-setup(name='SSEA',
-      description='Sample Set Enrichment Analysis',
-      url='http://ssea.googlecode.com',
-      author='matthew iyer, yashar niknafs',
-      author_email='matthew.iyer@gmail.com',
-      requires=['numpy', 'jinja2'],
-      ext_modules=cythonize(ext_modules) + extensions,
-      packages={'ssea', 'ssea.lib'},
-      package_data={'ssea.templates': ['details.html',
-                                       'report.html']},
-      scripts=['ssea/ssea', 'ssea/ssea_gui'])
+def main():
+    setup(name='SSEA',
+          version=__version__,
+          description='Sample Set Enrichment Analysis',
+          author=__author__,
+          author_email=__email__,
+          requires=['numpy', 'jinja2', 'cython'],
+          license=__license__,
+          url='https://github.com/yniknafs/ssea',
+          ext_modules=cythonize(ext_modules) + extensions,
+          packages=['ssea', 'ssea.lib'],
+          package_data={'ssea.templates': ['details.html',
+                                           'report.html']},
+          scripts=['ssea/ssea', 'ssea/ssea_gui'])
+
+if __name__ == '__main__':
+    main()

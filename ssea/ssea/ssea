@@ -1,15 +1,16 @@
-#!/bin/env python
+#!/usr/bin/env python
 # encoding: utf-8
 '''
  -- Sample Set Enrichment Analysis (SSEA) --
 
-Assessment of enrichment in a ranked list of quantitative measurements 
+Assessment of enrichment in a ranked list of quantitative measurements
 
 @author:     mkiyer
 @author:     yniknafs
-        
-@copyright:  2013 Michigan Center for Translational Pathology. All rights reserved.
-        
+
+@copyright:  2013-2017 Michigan Center for Translational Pathology.
+All rights reserved.
+
 @license:    GPL2
 
 @contact:    mkiyer@umich.edu
@@ -27,7 +28,7 @@ __all__ = []
 PROFILE = 0
 
 # local imports
-from ssea.lib.config import Config 
+from ssea.lib.config import Config
 from ssea.lib.base import JobStatus, SampleSet, chunk
 from ssea.lib.countdata import BigCountMatrix
 from ssea.lib.algo import ssea_map, ssea_reduce, ssea_serial
@@ -56,11 +57,11 @@ def qsub(lines):
         return None
     job_id = stdoutdata.strip()
     return job_id
-  
+
 def read_sample_sets(config):
     '''
     config: ssea.lib.Config object with SSEA options specified
-    
+
     returns list of SampleSet objects
     '''
     # read sample sets
@@ -79,25 +80,25 @@ def read_sample_sets(config):
     filtered_sample_sets = []
     for sample_set in sample_sets:
         if ((config.smin > 0) and (len(sample_set) < config.smin)):
-            logging.warning("\tsample set %s excluded because size %d < %d" %                              
+            logging.warning("\tsample set %s excluded because size %d < %d" %
                             (sample_set.name, len(sample_set), config.smin))
-            continue        
+            continue
         if ((config.smax > 0) and (len(sample_set) > config.smax)):
-            logging.warning("\tsample set %s excluded because size %d > %d" % 
+            logging.warning("\tsample set %s excluded because size %d > %d" %
                             (sample_set.name, len(sample_set), config.smax))
             continue
-        logging.debug("\tsample set %s size %d" % 
+        logging.debug("\tsample set %s size %d" %
                       (sample_set.name, len(sample_set)))
         filtered_sample_sets.append(sample_set)
-    logging.info("\tNumber of filtered sample sets: %d" % 
+    logging.info("\tNumber of filtered sample sets: %d" %
                  (len(filtered_sample_sets)))
     sample_sets = filtered_sample_sets
     return sample_sets
 
 def read_sample_set_info(filename):
     '''
-    Sample set information is stored as a text file the base output 
-    directory of an SSEA run. This information can be helpful to 
+    Sample set information is stored as a text file the base output
+    directory of an SSEA run. This information can be helpful to
     find sample sets because the folder names are currently assigned
     integer identifiers.
     '''
@@ -122,7 +123,7 @@ def write_sample_set_info(ss_infos, filename):
             print >>fileh, '\t'.join(fields)
 
 def read_worker_info(filename):
-    worker_infos = []    
+    worker_infos = []
     with open(filename, 'r') as f:
         # search for worker index
         for line in f:
@@ -140,7 +141,7 @@ def write_worker_info(filename, num_jobs, num_processes):
     with open(filename, 'w') as f:
         for startrow, endrow in chunk(num_jobs, num_processes):
             i = num_workers
-            #logging.debug("Worker process %d range %d-%d (%d total rows)" % 
+            #logging.debug("Worker process %d range %d-%d (%d total rows)" %
             #              (i, startrow, endrow, (endrow-startrow)))
             basename = 'w%d' % (i)
             fields = [i, basename, startrow, endrow]
@@ -165,7 +166,7 @@ def ssea_setup(config):
     # read/process sample sets
     sample_sets = read_sample_sets(config)
     # read current file if exists
-    sample_set_info_file = os.path.join(config.output_dir, 
+    sample_set_info_file = os.path.join(config.output_dir,
                                         Config.SAMPLE_SET_INFO_FILE)
     ss_infos = []
     ss_names = set()
@@ -200,27 +201,27 @@ def ssea_setup(config):
         log_dir = os.path.join(sample_set_path, Config.LOG_DIR)
         if not os.path.exists(log_dir):
             logging.debug("Creating log directory '%s'" % (log_dir))
-            os.makedirs(log_dir)         
+            os.makedirs(log_dir)
         # write configuration file
         logging.debug("Writing configuration file")
-        config_file = os.path.join(sample_set_path, Config.CONFIG_JSON_FILE) 
+        config_file = os.path.join(sample_set_path, Config.CONFIG_JSON_FILE)
         with open(config_file, 'w') as fp:
             print >>fp, config.to_json()
         # write sample set file
         logging.debug("Writing sample set file")
-        sample_set_file = os.path.join(sample_set_path, Config.SAMPLE_SET_JSON_FILE) 
+        sample_set_file = os.path.join(sample_set_path, Config.SAMPLE_SET_JSON_FILE)
         with open(sample_set_file, 'w') as fp:
             print >>fp, sample_set.to_json()
         # map work into chunks
         worker_file = os.path.join(sample_set_path, WORKER_FILE)
-        write_worker_info(worker_file, 
-                          num_jobs=shape[0], 
+        write_worker_info(worker_file,
+                          num_jobs=shape[0],
                           num_processes=config.num_processes)
         # add to sample set info list
-        ss_info = SSInfo(id=ss_id, 
+        ss_info = SSInfo(id=ss_id,
                          dirname=sample_set_dirname,
-                         name=sample_set.name, 
-                         desc=sample_set.desc, 
+                         name=sample_set.name,
+                         desc=sample_set.desc,
                          size=len(sample_set))
         ss_infos.append(ss_info)
         # mark job status as ready
@@ -231,17 +232,17 @@ def ssea_setup(config):
 
 def ssea_start(config, ssea_script):
     '''
-    multiprocessing map/reduce implementation of ssea    
+    multiprocessing map/reduce implementation of ssea
     '''
     # check output directory
     if not os.path.exists(config.output_dir):
-        logging.error("Output directory '%s' not found" % 
+        logging.error("Output directory '%s' not found" %
                       (config.output_dir))
         return 1
-    sample_set_info_file = os.path.join(config.output_dir, 
+    sample_set_info_file = os.path.join(config.output_dir,
                                         Config.SAMPLE_SET_INFO_FILE)
     if not os.path.exists(sample_set_info_file):
-        logging.error("Sample set info file '%s' not found" % 
+        logging.error("Sample set info file '%s' not found" %
                       (sample_set_info_file))
         return 1
     # read pbs configuration commands (cluster mode only)
@@ -278,11 +279,11 @@ def ssea_start(config, ssea_script):
         # read worker information
         worker_file = os.path.join(sample_set_path, WORKER_FILE)
         worker_infos = read_worker_info(worker_file)
-        if config.cluster is None:        
+        if config.cluster is None:
             worker_basenames = [os.path.join(tmp_dir, w.basename) for w in worker_infos]
             worker_chunks = [(w.startrow, w.endrow) for w in worker_infos]
             # output files
-            logging.info("Running SSEA map step with %d parallel processes " % 
+            logging.info("Running SSEA map step with %d parallel processes " %
                          (len(worker_infos)))
             # map step
             ssea_map(config, sample_set, worker_basenames, worker_chunks)
@@ -302,15 +303,15 @@ def ssea_start(config, ssea_script):
             num_workers = len(worker_infos)
             sample_set_abspath = os.path.abspath(sample_set_path)
             # calculate job walltime
-            num_tests = (max_chunk_size * shape[1] * 
+            num_tests = (max_chunk_size * shape[1] *
                          (1 + config.perms + config.resampling_iterations))
             hours = (num_tests * SECS_PER_ITER_MAP * HOURS_PER_SEC)
             padded_hours = int(hours + PADDING_HOURS) # padding
             logging.debug('Map step walltime calculation: %d rows/chunk %d '
                           'samples %d perms %d resamplings' %
-                          (max_chunk_size, shape[1], config.perms, 
+                          (max_chunk_size, shape[1], config.perms,
                            config.resampling_iterations))
-            logging.debug('\tAt %fs per iteration this will take %f hours' % 
+            logging.debug('\tAt %fs per iteration this will take %f hours' %
                           (SECS_PER_ITER_MAP, hours))
             logging.debug('\tPadded walltime is %dh' % (padded_hours))
             # make pbs resource fields
@@ -328,7 +329,7 @@ def ssea_start(config, ssea_script):
             lines.append("#PBS -o %s" % (os.path.join(log_dir, 'map.stdout')))
             lines.append("#PBS -e %s" % (os.path.join(log_dir, 'map.stderr')))
             # command line args
-            args = ['python', ssea_script, '-v', '--cluster-map', '-o', 
+            args = ['python', ssea_script, '-v', '--cluster-map', '-o',
                     sample_set_abspath]
             lines.append(' '.join(args))
             lines.append('')
@@ -347,8 +348,8 @@ def ssea_start(config, ssea_script):
             num_results = shape[0]
             hours = (num_results * SECS_PER_ITER_REDUCE * HOURS_PER_SEC)
             padded_hours = int(hours + PADDING_HOURS) # padding
-            logging.debug('Reduce walltime calculation: %d rows' % (shape[0])) 
-            logging.debug('\tAt %fs per iteration this will take %f hours' % 
+            logging.debug('Reduce walltime calculation: %d rows' % (shape[0]))
+            logging.debug('\tAt %fs per iteration this will take %f hours' %
                           (SECS_PER_ITER_REDUCE, hours))
             logging.debug('\tPadded reduce walltime is %dh' % (padded_hours))
             # make pbs resource fields
@@ -365,7 +366,7 @@ def ssea_start(config, ssea_script):
             lines.append("#PBS -e %s" % (os.path.join(log_dir, 'reduce.stderr')))
             lines.append("#PBS -W depend=afterokarray:%s" % (job_array_id))
             # command line args
-            args = ['python', ssea_script, '-v', '--cluster-reduce', '-o', 
+            args = ['python', ssea_script, '-v', '--cluster-reduce', '-o',
                     sample_set_abspath]
             lines.append(' '.join(args))
             lines.append('')
@@ -408,7 +409,7 @@ def ssea_cluster_map(output_dir):
         return 1
     # run SSEA algorithm
     worker_basename = os.path.join(output_dir, Config.TMP_DIR, worker.basename)
-    return ssea_serial(config, sample_set, worker_basename, worker.startrow, 
+    return ssea_serial(config, sample_set, worker_basename, worker.startrow,
                        worker.endrow)
 
 def ssea_cluster_reduce(output_dir):
