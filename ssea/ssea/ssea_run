@@ -23,8 +23,7 @@ def main():
     # instantiate from command line
     R = Run.create()
     R.log_args()
-    return 0
-
+    return R.start()
 
 
 if __name__ == '__main__':

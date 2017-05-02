@@ -27,11 +27,11 @@ NPY_HISTS_SUFFIX = '.hists.npz'
 
 # improves readability of code
 KernelResult = namedtuple('KernelResult', ('ranks',
-                                           'norm_counts', 
+                                           'norm_counts',
                                            'norm_counts_miss',
                                            'norm_counts_hit',
-                                           'es_val', 
-                                           'es_rank', 
+                                           'es_val',
+                                           'es_rank',
                                            'es_run'))
 
 # batch sort configuration
@@ -41,9 +41,9 @@ SORT_BUFFER_SIZE = 32000
 FLOAT_PRECISION = 8
 SCIENTIFIC_NOTATION_PRECISION = 200
 
-# to compute FDR q values we need to store normalized enrichment 
+# to compute FDR q values we need to store normalized enrichment
 # scores (NES). we accomplish this storing a histogram of NES values during
-# runtime and then merging histograms from parallel processes prior to 
+# runtime and then merging histograms from parallel processes prior to
 # computing global statistics. the NES can range from [-inf, +inf] making
 # it difficult for a histogram to store enough granularity in few bins.
 # we accomplish this here by using log-space histogram bins that vary from
@@ -74,11 +74,11 @@ def ssea_run(counts, size_factors, membership, rng, config):
     membership: int array (0 or 1) with set membership
     rng: RandomState object
     config: Config object
-    '''    
+    '''
     # run kernel to generate a range of observed enrichment scores
     resample_rand_seeds = np.empty(config.resampling_iterations, dtype=np.int)
     resample_count_ranks = np.empty((config.resampling_iterations, counts.shape[0]), dtype=np.int)
-    resample_es_vals = np.zeros(config.resampling_iterations, dtype=np.float) 
+    resample_es_vals = np.zeros(config.resampling_iterations, dtype=np.float)
     resample_es_ranks = np.zeros(config.resampling_iterations, dtype=np.int)
     for i in xrange(config.resampling_iterations):
         # save random number generator seed before running kernel
@@ -87,7 +87,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
                         resample_counts=True,
                         permute_samples=False,
                         add_noise=True,
-                        noise_loc=config.noise_loc, 
+                        noise_loc=config.noise_loc,
                         noise_scale=config.noise_scale,
                         method_miss=config.weight_miss,
                         method_hit=config.weight_hit,
@@ -100,7 +100,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
     median_index = int(config.resampling_iterations / 2)
     median_index = resample_es_vals.argsort()[median_index]
     median_es_val = resample_es_vals[median_index]
-    # choose whether to use the positive or negative side of the 
+    # choose whether to use the positive or negative side of the
     # distribution based on the median ES value
     if median_es_val == 0:
         return Result.default(), np.zeros((0,), dtype=np.float)
@@ -124,7 +124,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
     ranks = resample_count_ranks[median_index]
     es_sign = cmp(es_val, 0)
     # permute samples and determine ES null distribution
-    null_es_vals = np.zeros(config.perms, dtype=np.float) 
+    null_es_vals = np.zeros(config.perms, dtype=np.float)
     null_es_ranks = np.zeros(config.perms, dtype=np.float)
     i = 0
     while i < config.perms:
@@ -132,7 +132,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
                         resample_counts=True,
                         permute_samples=True,
                         add_noise=True,
-                        noise_loc=config.noise_loc, 
+                        noise_loc=config.noise_loc,
                         noise_scale=config.noise_scale,
                         method_miss=config.weight_miss,
                         method_hit=config.weight_hit,
@@ -142,7 +142,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
             null_es_vals[i] = k.es_val
             null_es_ranks[i] = k.es_rank
             i += 1
-    # Subset the null ES scores to only positive or negative 
+    # Subset the null ES scores to only positive or negative
     null_sign_inds = signfunc(null_es_vals, 0)
     null_es_vals = null_es_vals[null_sign_inds]
     null_es_ranks = null_es_ranks[null_sign_inds]
@@ -167,7 +167,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
     res.es_rank = int(es_rank)
     res.nominal_p_value = round(p_value, SCIENTIFIC_NOTATION_PRECISION)
     res.nes = round(nes_val, FLOAT_PRECISION)
-    # save some of the resampled es points 
+    # save some of the resampled es points
     res.resample_es_vals = np.around(resample_es_vals[:Result.MAX_POINTS], FLOAT_PRECISION)
     res.resample_es_ranks = resample_es_ranks[:Result.MAX_POINTS]
     # save null distribution points
@@ -212,14 +212,13 @@ def ssea_run(counts, size_factors, membership, rng, config):
     # return result and null distribution for subsequent fdr calculations
     return res, null_nes_vals
 
-def ssea_serial(config, sample_set, output_basename, 
+def ssea_serial(config, sample_set, output_basename,
                 startrow=None, endrow=None):
     '''
     main SSEA loop (single processor)
-    
-    matrix_dir: numpy memmap matrix containing numeric data 
-    sample_set: SampleSet object
+
     config: Config object
+    sample_set: SampleSet object
     output_basename: prefix for writing result files
     '''
     # initialize random number generator
@@ -255,7 +254,7 @@ def ssea_serial(config, sample_set, output_basename,
             res = Result.default()
         else:
             # run ssea
-            res, null_nes_vals = ssea_run(counts, size_factors, 
+            res, null_nes_vals = ssea_run(counts, size_factors,
                                           valid_membership, rng, config)
             # update histograms
             null_keys = []
@@ -287,7 +286,7 @@ def ssea_serial(config, sample_set, output_basename,
     # make tmp dir for sorting
     if os.path.exists(output_basename):
         shutil.rmtree(output_basename)
-    os.makedirs(output_basename) 
+    os.makedirs(output_basename)
     # call batch sort python function
     sorted_json_file = output_basename + JSON_SORTED_SUFFIX
     batch_sort(input=unsorted_json_file,
@@ -298,14 +297,14 @@ def ssea_serial(config, sample_set, output_basename,
     # remove tmp dir
     shutil.rmtree(output_basename)
     # remove unsorted json file
-    os.remove(unsorted_json_file)    
+    os.remove(unsorted_json_file)
     logging.debug("Worker %s: done" % (output_basename))
     return 0
 
 def ssea_map(config, sample_set, worker_basenames, worker_chunks):
     '''
     parallel map step of SSEA run
-    
+
     processes chunks of input matrix in parallel using multiprocessing
     '''
     # start worker processes
@@ -313,7 +312,7 @@ def ssea_map(config, sample_set, worker_basenames, worker_chunks):
     for i in xrange(len(worker_basenames)):
         basename = worker_basenames[i]
         startrow, endrow = worker_chunks[i]
-        args = (config, sample_set, basename, startrow, endrow)        
+        args = (config, sample_set, basename, startrow, endrow)
         p = Process(target=ssea_serial, args=args)
         p.start()
         procs.append(p)
@@ -326,7 +325,7 @@ def compute_qvalues(json_iterator, hists_file):
     '''
     computes fdr q values from json Result objects sorted
     by abs(NES) (low to high)
-    
+
     json_iterator: iterator that yields json objects in sorted order
     hists_file: contains histogram data from null distribution
     '''
@@ -348,7 +347,7 @@ def compute_qvalues(json_iterator, hists_file):
     tot_obs = [cdfs['obs_nes_neg'][-1], cdfs['obs_nes_pos'][-1]]
     cur_ranks = [tot_obs[0], tot_obs[1]]
     min_fdrs = [1.0, 1.0]
-    # perform merge of sorted json files 
+    # perform merge of sorted json files
     for line in json_iterator:
         # load json document (one per line)
         res = Result.from_json(line.strip())
@@ -361,15 +360,15 @@ def compute_qvalues(json_iterator, hists_file):
             else:
                 sign_ind = POS
                 sign = 1.0
-            # For a given NES(S) = NES* >= 0, the FDR is the ratio of the 
-            # percentage of all permutations NES(S,null) >= 0, whose 
-            # NES(S,null) >= NES*, divided by the percentage of observed S with 
-            # NES(S) >= 0, whose NES(S) >= NES*, and similarly for 
-            # NES(S) = NES* <= 0.        
+            # For a given NES(S) = NES* >= 0, the FDR is the ratio of the
+            # percentage of all permutations NES(S,null) >= 0, whose
+            # NES(S,null) >= NES*, divided by the percentage of observed S with
+            # NES(S) >= 0, whose NES(S) >= NES*, and similarly for
+            # NES(S) = NES* <= 0.
             # to compute a sample set specific FDR q value we look at the
             # aggregated enrichment scores for all tests of that sample set
-            # compute the cumulative sums of NES histograms use interpolation 
-            # to find fraction NES(null) >= NES* and account for the observed 
+            # compute the cumulative sums of NES histograms use interpolation
+            # to find fraction NES(null) >= NES* and account for the observed
             # permutation in the null set interpolate NES in log space
             null_nes_cumsum = cdfs[null_keys[sign_ind]]
             null_n = interp(log_nes_clip, LOG_NES_BINS, null_nes_cumsum)
@@ -383,12 +382,12 @@ def compute_qvalues(json_iterator, hists_file):
                 res.ss_fdr_q_value = 0.0
             else:
                 res.ss_fdr_q_value = n / d
-            #print 'SS_ID=%d ES=%f NES=%f fdr=%f minfdr=%f' % (i, res.es, res.nes, res.ss_fdr_q_value, min_fdrs[i]) 
+            #print 'SS_ID=%d ES=%f NES=%f fdr=%f minfdr=%f' % (i, res.es, res.nes, res.ss_fdr_q_value, min_fdrs[i])
             # compare with minimum FDR and adjust minimum FDR if necessary
             if res.ss_fdr_q_value < min_fdrs[sign_ind]:
                 min_fdrs[sign_ind] = res.ss_fdr_q_value
             else:
-                res.ss_fdr_q_value = min_fdrs[sign_ind]            
+                res.ss_fdr_q_value = min_fdrs[sign_ind]
             res.ss_rank = cur_ranks[sign_ind]
             res.ss_frac = sign * (1.0 - ((res.ss_rank - 1) / float(tot_obs[sign_ind])))
             cur_ranks[sign_ind] -= 1
@@ -401,7 +400,7 @@ def compute_qvalues(json_iterator, hists_file):
 def ssea_reduce(input_basenames, output_json_file, output_hist_file):
     '''
     reduce step of SSEA run
-    
+
     merges the null distribution histograms from individual worker
     processes from the map step, and then merges the sorted results
     json files from individual worker processes and computes global
@@ -411,7 +410,7 @@ def ssea_reduce(input_basenames, output_json_file, output_hist_file):
     logging.debug("Merging %d worker histograms" % (len(input_basenames)))
     hists = _init_hists()
     json_iterables = []
-    for i in xrange(len(input_basenames)):        
+    for i in xrange(len(input_basenames)):
         # create sorted json file streams
         json_file = input_basenames[i] + JSON_SORTED_SUFFIX
         json_fileh = open(json_file, 'rb', 64*1024)
@@ -436,7 +435,7 @@ def ssea_reduce(input_basenames, output_json_file, output_hist_file):
                 pass
     # remove worker files
     logging.debug("Removing temporary files")
-    for i in xrange(len(input_basenames)):        
+    for i in xrange(len(input_basenames)):
         hist_file = input_basenames[i] + NPY_HISTS_SUFFIX
         os.remove(hist_file)
         json_file = input_basenames[i] + JSON_SORTED_SUFFIX

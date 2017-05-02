@@ -7,7 +7,7 @@ import argparse
 import logging
 import numpy as np
 
-from ssea.lib.countdata import CountMatrix
+from ssea.lib.countdata import BigCountMatrix
 
 __author__ = "Matthew Iyer, Yashar Niknafs"
 __copyright__ = "Copyright 2012-2017"
@@ -42,7 +42,7 @@ def main():
         os.makedirs(output_dir)
     # convert matrix
     logging.info('Importing')
-    bm = CountMatrix.from_tsv(tsv_file, output_dir,
+    bm = BigCountMatrix.from_tsv(tsv_file, output_dir,
                               na_values=na_values)
     logging.info("Estimating size factors")
     bm.estimate_size_factors()

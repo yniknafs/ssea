@@ -18,7 +18,7 @@ __email__ = "yniknafs@umich.edu"
 __status__ = "Development"
 
 
-class CountMatrix(object):
+class BigCountMatrix(object):
     VERSION = '0.1.0'
     MEMMAP_FILE = 'counts.memmap'
     MEMMAP_T_FILE = 'counts.transpose.memmap'
@@ -41,13 +41,13 @@ class CountMatrix(object):
 
     @staticmethod
     def open(input_dir):
-        counts_file = os.path.join(input_dir, CountMatrix.MEMMAP_FILE)
-        counts_t_file = os.path.join(input_dir, CountMatrix.MEMMAP_T_FILE)
-        rownames_file = os.path.join(input_dir, CountMatrix.ROWNAMES_FILE)
-        colnames_file = os.path.join(input_dir, CountMatrix.COLNAMES_FILE)
-        size_factors_file = os.path.join(input_dir, CountMatrix.SIZE_FACTORS_FILE)
-        lengths_file = os.path.join(input_dir, CountMatrix.LENGTHS_FILE)
-        self = CountMatrix()
+        counts_file = os.path.join(input_dir, BigCountMatrix.MEMMAP_FILE)
+        counts_t_file = os.path.join(input_dir, BigCountMatrix.MEMMAP_T_FILE)
+        rownames_file = os.path.join(input_dir, BigCountMatrix.ROWNAMES_FILE)
+        colnames_file = os.path.join(input_dir, BigCountMatrix.COLNAMES_FILE)
+        size_factors_file = os.path.join(input_dir, BigCountMatrix.SIZE_FACTORS_FILE)
+        lengths_file = os.path.join(input_dir, BigCountMatrix.LENGTHS_FILE)
+        self = BigCountMatrix()
         self.matrix_dir = input_dir
         with open(rownames_file, 'r') as fileh:
             self.rownames = [line.strip() for line in fileh]
@@ -78,12 +78,12 @@ class CountMatrix(object):
             colsubset = set(colsubset)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        counts_file = os.path.join(output_dir, CountMatrix.MEMMAP_FILE)
-        counts_t_file = os.path.join(output_dir, CountMatrix.MEMMAP_T_FILE)
-        rownames_file = os.path.join(output_dir, CountMatrix.ROWNAMES_FILE)
-        colnames_file = os.path.join(output_dir, CountMatrix.COLNAMES_FILE)
-        size_factors_file = os.path.join(output_dir, CountMatrix.SIZE_FACTORS_FILE)
-        lengths_file = os.path.join(output_dir, CountMatrix.LENGTHS_FILE)
+        counts_file = os.path.join(output_dir, BigCountMatrix.MEMMAP_FILE)
+        counts_t_file = os.path.join(output_dir, BigCountMatrix.MEMMAP_T_FILE)
+        rownames_file = os.path.join(output_dir, BigCountMatrix.ROWNAMES_FILE)
+        colnames_file = os.path.join(output_dir, BigCountMatrix.COLNAMES_FILE)
+        size_factors_file = os.path.join(output_dir, BigCountMatrix.SIZE_FACTORS_FILE)
+        lengths_file = os.path.join(output_dir, BigCountMatrix.LENGTHS_FILE)
         # write rownames and colnames
         with open(rownames_file, 'w') as fileh:
             row_inds = []
@@ -126,7 +126,7 @@ class CountMatrix(object):
     def from_tsv(input_file, output_dir, na_values=None):
         '''
         convert/copy a tab-delimited file containing numeric weight data
-        to a CountMatrix (memmap files)
+        to a BigCountMatrix (memmap files)
 
         input_file: string path to tab-delimited matrix file
         output_dir: output directory
@@ -138,13 +138,13 @@ class CountMatrix(object):
             na_values = set(na_values)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        counts_file = os.path.join(output_dir, CountMatrix.MEMMAP_FILE)
-        counts_t_file = os.path.join(output_dir, CountMatrix.MEMMAP_T_FILE)
-        rownames_file = os.path.join(output_dir, CountMatrix.ROWNAMES_FILE)
-        colnames_file = os.path.join(output_dir, CountMatrix.COLNAMES_FILE)
-        lengths_file = os.path.join(output_dir, CountMatrix.LENGTHS_FILE)
+        counts_file = os.path.join(output_dir, BigCountMatrix.MEMMAP_FILE)
+        counts_t_file = os.path.join(output_dir, BigCountMatrix.MEMMAP_T_FILE)
+        rownames_file = os.path.join(output_dir, BigCountMatrix.ROWNAMES_FILE)
+        colnames_file = os.path.join(output_dir, BigCountMatrix.COLNAMES_FILE)
+        lengths_file = os.path.join(output_dir, BigCountMatrix.LENGTHS_FILE)
 
-        self = CountMatrix()
+        self = BigCountMatrix()
         self.matrix_dir = output_dir
         # get rownames, colnames, and lengths
         with open(input_file, 'r') as fileh:
@@ -240,7 +240,7 @@ class CountMatrix(object):
                 size_factors[j] = a.sum()
             size_factors = size_factors / np.median(size_factors)
         self.size_factors = size_factors
-        size_factors_file = os.path.join(self.matrix_dir, CountMatrix.SIZE_FACTORS_FILE)
+        size_factors_file = os.path.join(self.matrix_dir, BigCountMatrix.SIZE_FACTORS_FILE)
         with open(size_factors_file, 'w') as fileh:
             for x in self.size_factors:
                 print >>fileh, x

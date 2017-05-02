@@ -7,7 +7,7 @@ import argparse
 import logging
 import numpy as np
 
-from ssea.lib.countdata import CountMatrix
+from ssea.lib.countdata import BigCountMatrix
 
 __author__ = "Matthew Iyer, Yashar Niknafs"
 __copyright__ = "Copyright 2012-2017"

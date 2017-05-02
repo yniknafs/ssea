@@ -5,9 +5,11 @@ import os
 import argparse
 import logging
 import pickle
+import shutil
 
-from base import WEIGHT_METHODS, ParserError, SampleSet
-from countdata import CountMatrix
+from base import WEIGHT_METHODS, ParserError, SampleSet, chunk
+from countdata import BigCountMatrix
+from algo import ssea_map, ssea_reduce
 
 
 __author__ = "Matthew Iyer, Yashar Niknafs"
@@ -28,6 +30,7 @@ class Args:
     NUM_PROCESSES = 1
     OUTPUT_DIR = 'ssea_output'
     NUM_PERMUTATIONS = 1000
+    RESAMPLING_ITERATIONS = 101
     WEIGHT_MISS_DEFAULT = 'log'
     WEIGHT_HIT_DEFAULT = 'log'
     WEIGHT_PARAM = 1.0
@@ -81,6 +84,12 @@ class Args:
                          	help='Either log2(n + X) for log transform or '
                          	'pow(n,X) for exponential (root) transform '
                          	'[default=%(default)s]')
+        parser.add_argument('--resampling_iterations', type=int,
+                            metavar='N',
+                            dest='resampling_iterations',
+                            default=Args.RESAMPLING_ITERATIONS,
+                            help='number of times randomly resample counts'
+                            '(advanced) [default=%(default)s]')
         parser.add_argument('--noise-loc', dest='noise_loc', type=float,
                          	default=Args.NOISE_LOC,
                          	help='noise parameter (advanced)'
@@ -93,7 +102,7 @@ class Args:
                             dest='sample_set_file',
                             help='File containing sample set')
         parser.add_argument('-c', '--count-matrix', required=True,
-                            dest='count_matrix_path',
+                            dest='matrix_dir',
                             help='Path to count matrix')
         return parser
 
@@ -121,7 +130,7 @@ class Args:
         func(fmt.format('noise_loc:', str(args.noise_loc)))
         func(fmt.format('noise_scale:', str(args.noise_scale)))
         func(fmt.format('sample_set_file:', str(args.sample_set_file)))
-        func(fmt.format('count_matrix_path:', str(args.count_matrix_path)))
+        func(fmt.format('matrix_dir:', str(args.matrix_dir)))
 
     @staticmethod
     def parse():
@@ -150,10 +159,10 @@ class Args:
             parser.error('sample set file "%s" not found' %
                         (args.sample_set_file))
         # count matrix path
-        if not os.path.exists(args.count_matrix_path):
+        if not os.path.exists(args.matrix_dir):
             parser.error('count matrix path "%s" not found' %
-                         (args.count_matrix_path))
-        args.count_matrix_path = os.path.abspath(args.count_matrix_path)
+                         (args.matrix_dir))
+        args.matrix_dir = os.path.abspath(args.matrix_dir)
         return args
 
 
@@ -163,6 +172,8 @@ class Results(object):
     STATUS_FILE = 'status.json'
     ARGS_FILE = 'args.pickle'
     SAMPLE_SET_FILE = 'sample_set.json'
+    RESULTS_JSON_FILE = 'results.json'
+    HISTS_NPZ_FILE = 'hists.npz'
 
     def __init__(self, output_dir):
         self.output_dir = output_dir
@@ -170,6 +181,8 @@ class Results(object):
         self.log_dir = os.path.join(output_dir, Results.LOG_DIR)
         self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
         self.sample_set_file = os.path.join(output_dir, Results.SAMPLE_SET_FILE)
+        self.results_json_file = os.path.join(output_dir, Results.RESULTS_JSON_FILE)
+        self.hists_npz_file = os.path.join(output_dir, Results.HISTS_NPZ_FILE)
 
 
 class Run(object):
@@ -183,7 +196,6 @@ class Run(object):
         # parse command line args
         args = Args.parse()
         self.args = args
-        self.results = Results(args.output_dir)
 
         # setup logging
         if args.verbose:
@@ -194,7 +206,8 @@ class Run(object):
                             format="%(asctime)s pid=%(process)d "
                                    "%(levelname)s - %(message)s")
         # open count matrix
-        cm = CountMatrix.open(args.count_matrix_path)
+        cm = BigCountMatrix.open(args.matrix_dir)
+        self.cm = cm
         shape = cm.shape
 
         # open sample sets
@@ -213,9 +226,11 @@ class Run(object):
             raise ParserError("sample set invalid")
         logging.debug("Sample set %s size %d" %
                       (sample_set.name, len(sample_set)))
+        self.sample_set = sample_set
 
         # create output directories
-        results = self.results
+        results = Results(args.output_dir)
+        self.results = results
         if not os.path.exists(results.output_dir):
             logging.debug("Creating output directory '%s'" %
                           (results.output_dir))
@@ -234,3 +249,40 @@ class Run(object):
             print >>fp, sample_set.to_json()
 
         return self
+
+
+    def start(self):
+        args = self.args
+        results = self.results
+        shape = self.cm.shape
+        sample_set = self.sample_set
+
+        # setup a set of parallel worker processes
+        worker_prefixes = []
+        worker_chunks = []
+        i = 0
+        max_chunk_size = 0
+        for startrow, endrow in chunk(shape[0], args.num_processes):
+            worker_prefixes.append(os.path.join(results.tmp_dir, 'w%d' % i))
+            worker_chunks.append((startrow, endrow))
+            i += 1
+            max_chunk_size = max(max_chunk_size, endrow-startrow)
+        logging.debug("Worker processes: %d" % (i))
+        logging.debug("Max transcripts per worker: %d" % (max_chunk_size))
+
+        # map step
+        logging.info("Running SSEA map step with %d parallel processes " %
+                     (len(worker_prefixes)))
+        ssea_map(args, sample_set, worker_prefixes, worker_chunks)
+
+        # reduce step
+        logging.info("Running SSEA reduce step")
+        ssea_reduce(worker_prefixes, results.results_json_file,
+                    results.hists_npz_file)
+
+        # cleanup
+        if os.path.exists(results.tmp_dir):
+            shutil.rmtree(results.tmp_dir)
+        logging.info('done')
+
+        return 0
