@@ -171,7 +171,7 @@ class Results(object):
     LOG_DIR = 'log'
     STATUS_FILE = 'status.json'
     ARGS_FILE = 'args.pickle'
-    SAMPLE_SET_FILE = 'sample_set.json'
+    SAMPLE_SET_JSON_FILE = 'sample_set.json'
     RESULTS_JSON_FILE = 'results.json'
     HISTS_NPZ_FILE = 'hists.npz'
 
@@ -180,7 +180,7 @@ class Results(object):
         self.tmp_dir = os.path.join(output_dir, Results.TMP_DIR)
         self.log_dir = os.path.join(output_dir, Results.LOG_DIR)
         self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
-        self.sample_set_file = os.path.join(output_dir, Results.SAMPLE_SET_FILE)
+        self.sample_set_json_file = os.path.join(output_dir, Results.SAMPLE_SET_JSON_FILE)
         self.results_json_file = os.path.join(output_dir, Results.RESULTS_JSON_FILE)
         self.hists_npz_file = os.path.join(output_dir, Results.HISTS_NPZ_FILE)
 
@@ -245,7 +245,7 @@ class Run(object):
         # write command line args
         Args.dump(args, results.args_file)
         # write sample set file
-        with open(results.sample_set_file, 'w') as fp:
+        with open(results.sample_set_json_file, 'w') as fp:
             print >>fp, sample_set.to_json()
 
         return self
@@ -277,7 +277,8 @@ class Run(object):
 
         # reduce step
         logging.info("Running SSEA reduce step")
-        ssea_reduce(worker_prefixes, results.results_json_file,
+        ssea_reduce(worker_prefixes,
+                    results.results_json_file,
                     results.hists_npz_file)
 
         # cleanup

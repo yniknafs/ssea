@@ -1,0 +1,101 @@
+{% extends "layout.html" %}
+
+{% block body %}
+
+<div class="ui segment">
+  Sample Set: {{ sample_set.name }} Description: {{ sample_set.desc }}
+</div>
+<div class="ui segments">
+  <div class="ui segment">
+    <table id="table-ssea" class="ui celled table" cellspacing="0" width="100%">
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block bodyjs %}
+
+<script type="text/javascript" language="javascript" charset="utf-8">
+  $(document).ready(function(){
+    var table = $('#table-ssea').DataTable({
+      "processing": true,
+      "serverSide": true,
+      "ajax": "{{ url_for('data') }}",
+      "order": [[1, 'asc']],
+      "columns": [
+        { "className": 'details-control',
+          "title": "Details",
+          "searchable": false,
+          "orderable": false,
+          "data": null,
+          "defaultContent": ''
+        },
+        { "title": "ID",
+          "searchable": "true",
+          "data": "t_id" },
+        { "title": "Name",
+          "searchable": "true",
+          "data": "name" },
+        { "title": "NES",
+          "searchable": "false",
+          "data": "nes" },
+        { "title": "Fold change",
+          "searchable": "false",
+          "data": "fold_change",
+          render: function(data, type, row) {
+            return parseFloat(data).toFixed(4);
+          }
+        },
+        { "title": "LE fold change",
+          "searchable": "false",
+          "data": "core_fold_change",
+          render: function(data, type, row) {
+            return parseFloat(data).toFixed(4);
+          }
+        },
+        { "title": "Nominal p-value",
+          "searchable": "false",
+          "data": "nominal_p_value",
+          render: function(data, type, row) {
+            return parseFloat(data).toFixed(4);
+          }
+        },
+        { "title": "FDR q-value",
+          "searchable": "false",
+          "data": "ss_fdr_q_value",
+          render: function(data, type, row) {
+            return parseFloat(data).toFixed(4);
+          }
+        },
+        { "title": "Fisher p-value",
+          "searchable": "false",
+          "data": "fisher_p_value",
+          render: function(data, type, row) {
+            return parseFloat(data).toFixed(4);
+          }
+        }
+      ]
+    });
+
+    // Add event listener for opening and closing details
+    $('#table-ssea tbody').on('click', 'td.details-control', function () {
+      var tr = $(this).closest('tr');
+      var row = table.row(tr);
+      if ( row.child.isShown() ) {
+        // This row is already open - close it
+        row.child.hide();
+        tr.removeClass('shown');
+      } else {
+        // Open this row
+        row.child("<img src='/ssea_plot?t_id=" + row.data().t_id + "'/>").show();
+        tr.addClass('shown');
+      }
+    });
+
+  });
+
+</script>
+
+{% endblock %}

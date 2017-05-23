@@ -2,3 +2,9 @@
 *.pyc
 
 *.pyc
+
+*.pyc
+
+ssea/ssea/report/ssea_report.db
+
+ssea/ssea/__init__.pyc

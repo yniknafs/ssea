@@ -55,6 +55,7 @@ LOG_NES_BINS = np.log10(NES_BINS)
 NES_MIN = NES_BINS[0]
 NES_MAX = NES_BINS[-1]
 
+
 def _init_hists():
     '''returns a dictionary with histogram arrays initialized to zero'''
     return {'null_nes_pos': np.zeros(NUM_NES_BINS-1, dtype=np.float),
@@ -62,10 +63,12 @@ def _init_hists():
             'obs_nes_pos': np.zeros(NUM_NES_BINS-1, dtype=np.float),
             'obs_nes_neg': np.zeros(NUM_NES_BINS-1, dtype=np.float)}
 
+
 def _cmp_json_nes(line):
     '''comparison function for batch_sort'''
     res = Result.from_json(line.strip())
     return abs(res.nes)
+
 
 def ssea_run(counts, size_factors, membership, rng, config):
     '''
@@ -103,7 +106,7 @@ def ssea_run(counts, size_factors, membership, rng, config):
     # choose whether to use the positive or negative side of the
     # distribution based on the median ES value
     if median_es_val == 0:
-        return Result.default(), np.zeros((0,), dtype=np.float)
+        return Result(), np.zeros((0,), dtype=np.float)
     elif median_es_val < 0:
         signfunc = np.less
     else:
@@ -160,35 +163,59 @@ def ssea_run(counts, size_factors, membership, rng, config):
     # to the sign of the observed ES(S)
     p_value = (np.fabs(null_es_vals) >= np.fabs(es_val)).sum().astype(np.float)
     p_value /= null_es_vals.shape[0]
-    # Create result object for this SSEA test
-    res = Result()
-    res.rand_seed = int(rand_seed)
-    res.es = round(es_val, FLOAT_PRECISION)
-    res.es_rank = int(es_rank)
-    res.nominal_p_value = round(p_value, SCIENTIFIC_NOTATION_PRECISION)
-    res.nes = round(nes_val, FLOAT_PRECISION)
-    # save some of the resampled es points
-    res.resample_es_vals = np.around(resample_es_vals[:Result.MAX_POINTS], FLOAT_PRECISION)
-    res.resample_es_ranks = resample_es_ranks[:Result.MAX_POINTS]
+
+    # create result object for this SSEA test
+    r = Result()
+    r.rand_seed = int(rand_seed)
+    r.es = round(es_val, FLOAT_PRECISION)
+    r.es_rank = int(es_rank)
+    r.nominal_p_value = round(p_value, SCIENTIFIC_NOTATION_PRECISION)
+    r.nes = round(nes_val, FLOAT_PRECISION)
+
+    # save resampled es range
+    i = resample_es_vals.argmin()
+    r.es_min = resample_es_vals[i]
+    r.es_rank_min = resample_es_ranks[i]
+    i = resample_es_vals.argmax()
+    r.es_max = resample_es_vals[i]
+    r.es_rank_max = resample_es_ranks[i]
     # save null distribution points
-    res.null_es_mean = null_es_mean
-    res.null_es_vals = np.around(null_es_vals[:Result.MAX_POINTS], FLOAT_PRECISION)
-    res.null_es_ranks = null_es_ranks[:Result.MAX_POINTS]
-    # get indexes of hits in this set
-    m = membership[ranks]
-    hit_inds = (m > 0).nonzero()[0]
-    num_hits = hit_inds.shape[0]
-    num_misses = m.shape[0] - num_hits
-    # calculate leading edge stats
+    r.null_es_mean = null_es_mean
+    i = null_es_vals.argmin()
+    r.null_es_min = null_es_vals[i]
+    r.null_es_rank_min = null_es_ranks[i]
+    i = null_es_vals.argmax()
+    r.null_es_max = null_es_vals[i]
+    r.null_es_rank_max = null_es_ranks[i]
+
+    # membership arrays
+    rank_inds = ranks.argsort()
     if es_val < 0:
-        core_hits = sum(i >= es_rank for i in hit_inds)
-        core_misses = (m.shape[0] - es_rank) - core_hits
+        m_core = rank_inds >= es_rank
     else:
-        core_hits = sum(i <= es_rank for i in hit_inds)
-        core_misses = 1 + es_rank - core_hits
-    null_hits = num_hits - core_hits
-    null_misses = num_misses - core_misses
-    # fisher exact test (one-sided hypothesis that LE is enricheD)
+        m_core = rank_inds <= es_rank
+    m_null = np.logical_not(m_core)
+    m_hits = (membership > 0)
+    m_misses = np.logical_not(m_hits)
+    m_core_hits = np.logical_and(m_core, m_hits)
+
+    # leading edge stats
+    core_hits = m_core_hits.sum()
+    core_misses = np.logical_and(m_core, m_misses).sum()
+    null_hits = np.logical_and(m_null, m_hits).sum()
+    null_misses = np.logical_and(m_null, m_misses).sum()
+    num_hits = core_hits + null_hits
+    num_misses = core_misses + null_misses
+
+    # fold change
+    norm_counts = counts / size_factors
+    core_hits_mean = norm_counts[m_core_hits].mean() if core_hits > 0 else 0.0
+    hits_mean = norm_counts[m_hits].mean() if num_hits > 0 else 0.0
+    misses_mean = norm_counts[m_misses].mean() if num_misses > 0 else 1.0
+    core_fold_change = core_hits_mean / misses_mean
+    fold_change = hits_mean / misses_mean
+
+    # fisher exact test (one-sided hypothesis that LE is enriched)
     fisher_p_value = fisher.pvalue(core_hits, core_misses, null_hits, null_misses).right_tail
     # odds ratio
     n = np.inf if null_hits == 0 else float(core_hits) / null_hits
@@ -202,15 +229,19 @@ def ssea_run(counts, size_factors, membership, rng, config):
         odds_ratio = np.inf
     else:
         odds_ratio = np.nan if n == 0 else 0.0
+
     # create dictionary result
-    res.core_hits = int(core_hits)
-    res.core_misses = int(core_misses)
-    res.null_hits = int(null_hits)
-    res.null_misses = int(null_misses)
-    res.fisher_p_value = np.round(fisher_p_value, SCIENTIFIC_NOTATION_PRECISION)
-    res.odds_ratio = odds_ratio
+    r.core_hits = int(core_hits)
+    r.core_misses = int(core_misses)
+    r.null_hits = int(null_hits)
+    r.null_misses = int(null_misses)
+    r.fisher_p_value = np.round(fisher_p_value, SCIENTIFIC_NOTATION_PRECISION)
+    r.odds_ratio = odds_ratio
+    r.fold_change = fold_change
+    r.core_fold_change = core_fold_change
     # return result and null distribution for subsequent fdr calculations
-    return res, null_nes_vals
+    return r, null_nes_vals
+
 
 def ssea_serial(config, sample_set, output_basename,
                 startrow=None, endrow=None):
@@ -251,7 +282,7 @@ def ssea_serial(config, sample_set, output_basename,
         valid_membership = membership[valid_inds]
         # write dummy results for invalid rows
         if (valid_inds.sum() == 0) or (np.all(counts == 0)):
-            res = Result.default()
+            res = Result()
         else:
             # run ssea
             res, null_nes_vals = ssea_run(counts, size_factors,
@@ -272,6 +303,7 @@ def ssea_serial(config, sample_set, output_basename,
                 hists[obs_keys[k]] += np.histogram(obs_nes, NES_BINS)[0]
         # save t_id
         res.t_id = i
+        res.name = bm.rownames[i]
         # convert to json and write
         print >>outfileh, res.to_json()
     # close report file
@@ -301,6 +333,7 @@ def ssea_serial(config, sample_set, output_basename,
     logging.debug("Worker %s: done" % (output_basename))
     return 0
 
+
 def ssea_map(config, sample_set, worker_basenames, worker_chunks):
     '''
     parallel map step of SSEA run
@@ -320,6 +353,7 @@ def ssea_map(config, sample_set, worker_basenames, worker_chunks):
     for p in procs:
         p.join()
     return 0
+
 
 def compute_qvalues(json_iterator, hists_file):
     '''
@@ -396,6 +430,7 @@ def compute_qvalues(json_iterator, hists_file):
         yield os.linesep
     # cleanup
     hists.close()
+
 
 def ssea_reduce(input_basenames, output_json_file, output_hist_file):
     '''

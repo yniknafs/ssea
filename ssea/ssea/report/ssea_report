@@ -1,0 +1,297 @@
+#!/usr/bin/env python
+'''
+SSEA: Sample Set Enrichment Analysis
+'''
+import os
+import sys
+import logging
+import argparse
+import random
+import sqlite3
+import StringIO
+import numpy as np
+
+from flask import Flask, request, session, g, redirect, url_for, abort, \
+    render_template, flash, jsonify, send_file, make_response
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.gridspec as gridspec
+from matplotlib.patches import Polygon
+
+from ssea.lib.base import Result, SampleSet
+from ssea.lib.countdata import BigCountMatrix
+from ssea.lib.run import Results, Args
+from ssea.lib.kernel import ssea_kernel, RandomState
+
+from datatables import DTColumn, DTQuery
+
+__author__ = "Matthew Iyer, Yashar Niknafs"
+__copyright__ = "Copyright 2012-2017"
+__credits__ = ["Matthew Iyer", "Yashar Niknafs"]
+__license__ = "GPL"
+__version__ = "0.1.0"
+__maintainer__ = "Yashar Niknafs"
+__email__ = "yniknafs@umich.edu"
+__status__ = "Development"
+
+
+# create flask application
+app = Flask(__name__)
+# Load default config and override config from an environment variable
+app.config.update(dict(
+    DEBUG=True,
+    DATABASE=os.path.join(app.root_path, 'ssea_report.db'),
+    SECRET_KEY='development key',
+    USERNAME='admin',
+    PASSWORD='default'
+))
+
+
+# database globals
+TABLE_NAME = 'results'
+
+
+class SSEAData:
+    pass
+
+
+class ReportGenerator:
+    def __init__(self, input_dir):
+        self.results = Results(input_dir)
+        self.args = Args.load(self.results.args_file)
+        self.sample_set = SampleSet.parse_json(self.results.sample_set_json_file)[0]
+        self.bm = BigCountMatrix.open(self.args.matrix_dir)
+        self.lib_sizes = self._get_library_sizes()
+
+    def _get_library_sizes(self):
+        bm = self.bm
+        lib_sizes = np.empty(bm.shape[1], dtype=np.float)
+        for j in xrange(bm.shape[1]):
+            a = bm.counts_t[j,:]
+            a = a[np.isfinite(a)]
+            lib_sizes[j] = a.sum()
+        lib_sizes /= 1.0e6
+        return lib_sizes
+
+    def close(self):
+        self.bm.close()
+
+    def ssea_rerun(self, t_id, rand_seed=0):
+        sample_set = self.sample_set
+        bm = self.bm
+        args = self.args
+        # get membership array for sample set
+        membership = sample_set.get_array(bm.colnames)
+        valid_samples = (membership >= 0)
+        # read from memmap
+        counts = np.array(bm.counts[t_id,:], dtype=np.float)
+        # remove 'nan' values
+        valid_inds = np.logical_and(valid_samples, np.isfinite(counts))
+        # subset counts, size_factors, and membership array
+        counts = counts[valid_inds]
+        size_factors = bm.size_factors[valid_inds]
+        membership = membership[valid_inds]
+        # reproduce previous run
+        rng = RandomState(rand_seed)
+        (ranks, norm_counts, norm_counts_miss, norm_counts_hit,
+         es_val, es_rank, es_run) = \
+            ssea_kernel(counts, size_factors, membership, rng,
+                        resample_counts=False,
+                        permute_samples=False,
+                        add_noise=True,
+                        noise_loc=args.noise_loc,
+                        noise_scale=args.noise_scale,
+                        method_miss=args.weight_miss,
+                        method_hit=args.weight_hit,
+                        method_param=args.weight_param)
+        # make object for plotting
+        m = membership[ranks]
+        hit_indexes = (m > 0).nonzero()[0]
+        d = SSEAData()
+        d.counts = counts
+        d.membership = m
+        d.es = es_val
+        d.es_rank = es_rank
+        d.es_run = es_run
+        d.hit_indexes = hit_indexes
+        d.ranks = ranks
+        d.sample_inds = valid_inds.nonzero()[0][ranks]
+        d.raw_weights = norm_counts[ranks]
+        d.weights_miss = norm_counts_miss[ranks]
+        d.weights_hit = norm_counts_hit[ranks]
+        return d
+
+def db_connect():
+    conn = sqlite3.connect(app.config['DATABASE'])
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def db_get():
+    '''
+    Opens a new database connection if there is none yet for the
+    current application context.
+    '''
+    if not hasattr(g, 'sqlite_db'):
+        g.sqlite_db = db_connect()
+    return g.sqlite_db
+
+@app.teardown_appcontext
+def db_close(error):
+    """Closes the database again at the end of the request."""
+    if hasattr(g, 'sqlite_db'):
+        g.sqlite_db.close()
+
+
+def start(app):
+    # parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_dir')
+    args = parser.parse_args()
+    # load ssea results
+    rg = ReportGenerator(args.input_dir)
+    results_json_file = rg.results.results_json_file
+    app.config['REPORT_GENERATOR'] = rg
+    # wipe database
+    if os.path.exists(app.config['DATABASE']):
+        os.remove(app.config['DATABASE'])
+    # open database connection
+    conn = db_connect()
+    c = conn.cursor()
+    # create table
+    c.execute(Result.sqlite_table(TABLE_NAME))
+    # insert results into table
+    def results_iterator(filename):
+        with open(filename, 'r') as f:
+            for line in f:
+                r = Result.from_json(line.strip())
+                yield r.tuple()
+    stmt = "insert into {n} values {v}".format(n=TABLE_NAME, v=Result.SQLITE_VALUES)
+    c.executemany(stmt, results_iterator(results_json_file))
+    conn.commit()
+    c.close()
+    # matplotlib static figure for plotting
+    app.config['MATPLOTLIB_FIG'] = Figure()
+    # start app
+    app.run()
+
+
+Columns = [DTColumn(None, False),
+           DTColumn('t_id', True),
+           DTColumn('name', True),
+           DTColumn('nes', False),
+           DTColumn('fold_change', False),
+           DTColumn('core_fold_change', False),
+           DTColumn('nominal_p_value', False),
+           DTColumn('ss_fdr_q_value', False),
+           DTColumn('fisher_p_value', False)]
+
+
+@app.route('/data')
+def data():
+    """Return server side data."""
+    # GET parameters
+    params = request.args.to_dict()
+    app.logger.debug('params: ' + str(dict(params)))
+    q = DTQuery(dict(params), Columns)
+    output = q.execute(db_get(), TABLE_NAME)
+    app.logger.debug('output: ' + str(output))
+    return jsonify(output)
+
+
+@app.route('/ssea_plot')
+def ssea_plot():
+    t_id = request.args.get('t_id')
+    app.logger.debug('TID' + str(t_id))
+
+    # fetch results from database
+    conn = db_connect()
+    c = conn.cursor()
+    q = 'select * from {table} where t_id == {t_id}'.format(table=TABLE_NAME, t_id=t_id)
+    c.execute(q)
+    result = c.fetchone()
+    c.close()
+
+    # rerun ssea
+    rg = app.config['REPORT_GENERATOR']
+    sseadata = rg.ssea_rerun(t_id, result['rand_seed'])
+    app.logger.debug("RESULT "  + str(result['rand_seed']))
+
+    # plot
+    fig = app.config['MATPLOTLIB_FIG']
+    fig.clf()
+    gs = gridspec.GridSpec(3, 1, height_ratios=[2,1,1])
+    # running enrichment score
+    ax0 = fig.add_subplot(gs[0])
+    x = np.arange(len(sseadata.es_run))
+    y = sseadata.es_run
+    # p1 = ax0.scatter(result.resample_es_ranks, result.resample_es_vals,
+    #                  c='r', s=25.0, alpha=0.3, edgecolors='none')
+    # p2 = ax0.scatter(result.null_es_ranks, result.null_es_vals,
+    #                  c='b', s=25.0, alpha=0.3, edgecolors='none')
+    ax0.plot(x, y, lw=2, color='k', label='Enrichment profile')
+    ax0.axhline(y=0, color='gray')
+    ax0.axvline(x=sseadata.es_rank, lw=1, linestyle='--', color='black')
+    ax0.set_xlim((0, len(sseadata.es_run)))
+    #ax0.set_ylim((-1.0, 1.0))
+    ax0.grid(True)
+    ax0.set_xticklabels([])
+    ax0.set_ylabel('Enrichment score (ES)')
+    ax0.set_title('Enrichment Plot')
+    # legend = ax0.legend((p1,p2), ('Resampled ES', 'Null ES'), 'upper right',
+    #                     numpoints=1, scatterpoints=1,
+    #                     prop={'size': 'xx-small'})
+    # The frame is matplotlib.patches.Rectangle instance surrounding the legend.
+    # frame = legend.get_frame()
+    # frame.set_linewidth(0)
+    # membership in sample set
+    ax1 = fig.add_subplot(gs[1])
+    ax1.bar(np.arange(len(sseadata.membership)), sseadata.membership, width=1, linewidth=0, color='black')
+    #if len(sseadata.hit_indexes) > 0:
+    #    ax1.vlines(sseadata.hit_indexes, ymin=0, ymax=1, lw=0.5,
+    #               color='black', label='Hits')
+    ax1.set_xlim((0, len(sseadata.membership)))
+    ax1.set_ylim((0, 1))
+    ax1.set_xticks([])
+    ax1.set_yticks([])
+    ax1.set_xticklabels([])
+    ax1.set_yticklabels([])
+    ax1.set_ylabel('Set')
+    # weights
+    ax2 = fig.add_subplot(gs[2])
+    # TODO: if hit and miss weights differ add a legend
+    ax2.plot(sseadata.weights_miss, color='blue')
+    ax2.plot(sseadata.weights_hit, color='red')
+    ax2.set_xlim((0, len(sseadata.es_run)))
+    ax2.set_xlabel('Samples')
+    ax2.set_ylabel('Weights')
+    # TODO: this appears to cause errors in a platform-dependent manner
+    #fig.tight_layout()
+
+    canvas = FigureCanvas(fig)
+    output = StringIO.StringIO()
+    canvas.print_png(output)
+    response = make_response(output.getvalue())
+    response.mimetype = 'image/png'
+    return response
+
+    # axis = fig.add_subplot(1, 1, 1)
+    # xs = range(100)
+    # ys = [random.randint(1, 50) for x in xs]
+    # axis.plot(xs, ys)
+    # canvas = FigureCanvas(fig)
+    # output = StringIO.StringIO()
+    # canvas.print_png(output)
+    # response = make_response(output.getvalue())
+    # response.mimetype = 'image/png'
+    # return response
+
+
+@app.route('/')
+def home():
+    rg = app.config['REPORT_GENERATOR']
+    return render_template('home.html', sample_set=rg.sample_set)
+
+
+if __name__ == '__main__':
+    start(app)

@@ -65,8 +65,8 @@ class ReportConfig(object):
     def get_argument_parser(self, parser=None):
         if parser is None:
             parser = argparse.ArgumentParser()
-        parser.add_argument("-v", "--verbose", dest="verbose", 
-                            action="store_true", default=False, 
+        parser.add_argument("-v", "--verbose", dest="verbose",
+                            action="store_true", default=False,
                             help="set verbosity level [default: %(default)s]")
         parser.add_argument('-p', '--num-processes', dest='num_processes',
                             type=int, default=1,
@@ -78,19 +78,19 @@ class ReportConfig(object):
         parser.add_argument('input_dir')
         parser.add_argument('matrix_dir')
         grp = parser.add_argument_group("SSEA Report Options")
-        grp.add_argument('--html', dest="create_html", 
+        grp.add_argument('--html', dest="create_html",
                          action="store_true", default=self.create_html,
                          help='Create detailed html reports')
-        grp.add_argument('--pdf', dest="create_pdf", 
+        grp.add_argument('--pdf', dest="create_pdf",
                          action="store_true", default=self.create_pdf,
                          help='Create PDF plots')
-        grp.add_argument('--png', dest="create_png", 
+        grp.add_argument('--png', dest="create_png",
                          action="store_true", default=self.create_png,
                          help='Create PNG plots')
-        grp.add_argument('--exprpdf', dest="create_expr_pdf", 
+        grp.add_argument('--exprpdf', dest="create_expr_pdf",
                          action="store_true", default=self.create_expr_pdf,
                          help='Create expression PDF plots')
-        grp.add_argument('--exprpng', dest="create_expr_png", 
+        grp.add_argument('--exprpng', dest="create_expr_png",
                          action="store_true", default=self.create_expr_png,
                          help='Create expression PNG plots')
         grp.add_argument('--colmeta', dest='col_metadata_file',
@@ -99,7 +99,7 @@ class ReportConfig(object):
         grp.add_argument('--rowmeta', dest='row_metadata_file',
                          help='file containing metadata corresponding to each '
                          'row of the weight matrix file')
-        return parser        
+        return parser
 
     def log(self, log_func=logging.info):
         log_func("Parameters")
@@ -145,14 +145,14 @@ class ReportConfig(object):
         # check matrix directory
         if not os.path.exists(args.matrix_dir):
             parser.error("matrix directory '%s' not found" % (args.matrix_dir))
-        self.matrix_dir = args.matrix_dir        
+        self.matrix_dir = args.matrix_dir
         # setup output directory
         if args.output_dir is None:
             self.output_dir = os.path.join(self.input_dir, REPORT_DIR)
         else:
             self.output_dir = args.output_dir
         if os.path.exists(self.output_dir):
-            parser.error("Report directory '%s' already exists" % 
+            parser.error("Report directory '%s' already exists" %
                          (self.output_dir))
         if args.col_metadata_file is not None:
             if not os.path.exists(args.col_metadata_file):
@@ -206,17 +206,17 @@ def ssea_rerun(t_id, rand_seed, bm, ssea_config, sample_set):
     membership = membership[valid_inds]
     # reproduce previous run
     rng = RandomState(rand_seed)
-    (ranks, norm_counts, norm_counts_miss, norm_counts_hit, 
+    (ranks, norm_counts, norm_counts_miss, norm_counts_hit,
      es_val, es_rank, es_run) = \
         ssea_kernel(counts, size_factors, membership, rng,
                     resample_counts=False,
                     permute_samples=False,
                     add_noise=True,
-                    noise_loc=ssea_config.noise_loc, 
+                    noise_loc=ssea_config.noise_loc,
                     noise_scale=ssea_config.noise_scale,
                     method_miss=ssea_config.weight_miss,
                     method_hit=ssea_config.weight_hit,
-                    method_param=ssea_config.weight_param)    
+                    method_param=ssea_config.weight_param)
     # make object for plotting
     m = membership[ranks]
     hit_indexes = (m > 0).nonzero()[0]
@@ -258,7 +258,7 @@ def plot_enrichment(result, sseadata, title, fig=None):
     ax0.set_ylabel('Enrichment score (ES)')
     ax0.set_title(title)
     legend = ax0.legend((p1,p2), ('Resampled ES', 'Null ES'), 'upper right',
-                        numpoints=1, scatterpoints=1, 
+                        numpoints=1, scatterpoints=1,
                         prop={'size': 'xx-small'})
     # The frame is matplotlib.patches.Rectangle instance surrounding the legend.
     frame = legend.get_frame()
@@ -267,7 +267,7 @@ def plot_enrichment(result, sseadata, title, fig=None):
     ax1 = fig.add_subplot(gs[1])
     ax1.bar(np.arange(len(sseadata.membership)), sseadata.membership, width=1, linewidth=0, color='black')
     #if len(sseadata.hit_indexes) > 0:
-    #    ax1.vlines(sseadata.hit_indexes, ymin=0, ymax=1, lw=0.5, 
+    #    ax1.vlines(sseadata.hit_indexes, ymin=0, ymax=1, lw=0.5,
     #               color='black', label='Hits')
     ax1.set_xlim((0, len(sseadata.membership)))
     ax1.set_ylim((0, 1))
@@ -378,12 +378,12 @@ def plot_expression(t_id, transcript_length, lib_sizes, sample_set, bm, title, f
     weights = ['semibold', 'semibold']
     for tick,label in zip(range(len(data)),ax0.get_xticklabels()):
         k = tick % 2
-        ax0.text(pos[tick], top-(top*0.05), upperLabels[tick], 
-                 horizontalalignment='center', size='x-small', 
+        ax0.text(pos[tick], top-(top*0.05), upperLabels[tick],
+                 horizontalalignment='center', size='x-small',
                  weight=weights[k], color=boxColors[k])
     return fig
 
-def create_report(result, bm, lib_sizes, config, row_metadata, col_metadata, 
+def create_report(result, bm, lib_sizes, config, row_metadata, col_metadata,
                   ssea_config, sample_set):
     filedict = {}
     # rerun ssea
@@ -394,8 +394,8 @@ def create_report(result, bm, lib_sizes, config, row_metadata, col_metadata,
     if create_enrichment_plot:
         rowmeta = row_metadata[result.t_id]
         title = 'Enrichment plot: %s vs. %s' % (rowmeta['transcript_id'], sample_set.name)
-        fig = plot_enrichment(result, ssea_data, 
-                              title=title, 
+        fig = plot_enrichment(result, ssea_data,
+                              title=title,
                               fig=global_fig)
         if config.create_png:
             eplot_png = '%s.eplot.png' % (rowmeta['transcript_id'])
@@ -407,11 +407,11 @@ def create_report(result, bm, lib_sizes, config, row_metadata, col_metadata,
             filedict['eplot_pdf'] = eplot_pdf
     # expression plot
     create_expr_plot = config.create_expr_pdf or config.create_expr_png
-    if create_expr_plot:    
+    if create_expr_plot:
         transcript_length = int(rowmeta['transcript_length'])
         title = 'Expression plot: %s' % (rowmeta['transcript_id'])
-        fig = plot_expression(result.t_id, transcript_length, 
-                              lib_sizes, sample_set, bm, 
+        fig = plot_expression(result.t_id, transcript_length,
+                              lib_sizes, sample_set, bm,
                               title=title, fig=global_fig)
         if config.create_expr_png:
             exprplot_png = '%s.fpkm.png' % (rowmeta['transcript_id'])
@@ -430,13 +430,13 @@ def create_report(result, bm, lib_sizes, config, row_metadata, col_metadata,
         for i,ind in enumerate(ssea_data.hit_indexes):
             if ssea_data.es < 0:
                 is_enriched = int(ind >= ssea_data.es_rank)
-            else:                
+            else:
                 is_enriched = int(ind <= ssea_data.es_rank)
             colmeta = col_metadata[ssea_data.sample_inds[ind]]
-            rows.append([i, colmeta['library_id'], ind+1, 
+            rows.append([i, colmeta['library_id'], ind+1,
                          ssea_data.raw_weights[ind],
-                         ssea_data.weights_hit[ind], 
-                         ssea_data.es_run[ind], 
+                         ssea_data.weights_hit[ind],
+                         ssea_data.es_run[ind],
                          is_enriched])
         # write details to file
         details_tsv = '%s.tsv' % (rowmeta['transcript_id'])
@@ -472,18 +472,19 @@ def _producer_process(input_queue, filename, t_ids, num_processes):
         input_queue.put(None)
     logging.debug("Producer finished")
 
-def _worker_process(input_queue, output_queue, config, row_metadata, 
-                    col_metadata, ssea_config, sample_set): 
+
+def _worker_process(input_queue, output_queue, config, row_metadata,
+                    col_metadata, ssea_config, sample_set):
     # open data matrix
     bm = BigCountMatrix.open(config.matrix_dir)
     logging.debug('Getting total fragments per library')
-    lib_sizes = get_library_sizes(bm)    
+    lib_sizes = get_library_sizes(bm)
     # process results
     while True:
         result = input_queue.get()
         if result is None:
             break
-        d = create_report(result, bm, lib_sizes, config, row_metadata, col_metadata, 
+        d = create_report(result, bm, lib_sizes, config, row_metadata, col_metadata,
                           ssea_config, sample_set)
         # update result with location of files
         result.files = d
@@ -493,6 +494,7 @@ def _worker_process(input_queue, output_queue, config, row_metadata,
     # send done signal
     output_queue.put(None)
     logging.debug("Worker finished")
+
 
 def create_html_report(input_file, output_file, row_metadata, sample_set):
     def _result_parser(filename):
@@ -549,24 +551,24 @@ def report(config):
     sample_set_json_file = os.path.join(config.input_dir,
                                         Config.SAMPLE_SET_JSON_FILE)
     sample_set = SampleSet.parse_json(sample_set_json_file)[0]
-    ssea_config_json_file = os.path.join(config.input_dir, 
+    ssea_config_json_file = os.path.join(config.input_dir,
                                          Config.CONFIG_JSON_FILE)
     ssea_config = Config.parse_json(ssea_config_json_file)
     results_json_file = os.path.join(config.input_dir, Config.RESULTS_JSON_FILE)
     report_json_file = os.path.join(config.output_dir, 'report.json')
     # create multiprocessing queues for passing data
     input_queue = Queue(maxsize=config.num_processes*3)
-    output_queue = Queue(maxsize=config.num_processes*3)    
+    output_queue = Queue(maxsize=config.num_processes*3)
     # start a producer process
     logging.debug("Starting producer process and %d workers" % (config.num_processes))
-    args = (input_queue, results_json_file, set(row_metadata.keys()), 
+    args = (input_queue, results_json_file, set(row_metadata.keys()),
             config.num_processes)
     producer = Process(target=_producer_process, args=args)
     producer.start()
     # start consumer processes
     procs = []
     for i in xrange(config.num_processes):
-        args = (input_queue, output_queue, config, row_metadata, 
+        args = (input_queue, output_queue, config, row_metadata,
                 col_metadata, ssea_config, sample_set)
         p = Process(target=_worker_process, args=args)
         p.start()

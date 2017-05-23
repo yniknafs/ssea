@@ -19,6 +19,7 @@ __status__ = "Development"
 PROFILE = False
 PROFILE_FILENAME = 'ssea.prof'
 
+
 def main():
     # instantiate from command line
     R = Run.create()

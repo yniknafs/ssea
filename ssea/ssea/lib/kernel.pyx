@@ -30,7 +30,7 @@ ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
 
 cdef class RandomState:
-    cdef public int seed    
+    cdef public int seed
     def __cinit__(self, seed=0):
         if seed == 0:
             self.seed = rng.lcg_init_state()
@@ -61,13 +61,13 @@ def shufflei(np.ndarray[INT_t, ndim=1] x, RandomState r):
 @cython.wraparound(False)
 def resample_poisson(np.ndarray[FLOAT_t, ndim=1] x not None,
                      RandomState r):
-    cdef int i    
+    cdef int i
     for i in xrange(x.shape[0]):
         x[i] = rng.lcg_poisson(&r.seed, x[i])
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def add_gaussian_noise(np.ndarray[FLOAT_t, ndim=1] x not None, 
+def add_gaussian_noise(np.ndarray[FLOAT_t, ndim=1] x not None,
                        RandomState r,
                        double loc=0.0,
                        double scale=1.0):
@@ -86,11 +86,11 @@ def normalize_counts(np.ndarray[FLOAT_t, ndim=1] counts not None,
                      RandomState r,
                      bint resample,
                      bint add_noise,
-                     double noise_loc, 
+                     double noise_loc,
                      double noise_scale):
     cdef int i
     for i in xrange(counts.shape[0]):
-        # resample the count using the original count as the mean of a 
+        # resample the count using the original count as the mean of a
         # poisson distribution
         if resample:
             counts[i] = rng.lcg_poisson(&r.seed, counts[i])
@@ -112,7 +112,7 @@ def power_transform(np.ndarray[FLOAT_t, ndim=1] x not None,
     cdef int i, size
     cdef double v
     size = x.shape[0]
-    newx = np.empty_like(x)    
+    newx = np.empty_like(x)
     if method == UNWEIGHTED:
         for i in xrange(size):
             newx[i] = 1.0
@@ -156,17 +156,17 @@ def random_walk(np.ndarray[FLOAT_t, ndim=1] weights_miss not None,
     # if the number of samples is zero return immediately
     if nsamples == 0:
         return es_val, es_rank, es_run
-    # evaluate the fraction of samples in S "hits" and the fraction of 
+    # evaluate the fraction of samples in S "hits" and the fraction of
     # samples not in S "misses" present up to a given position i in L
     for i in xrange(nsamples):
-        # ranks contains indexes into the weight vectors that allow 
+        # ranks contains indexes into the weight vectors that allow
         # iteration in sorted order
         r = ranks[i]
         wt_miss = weights_miss[r]
         wt_hit = weights_hit[r]
         # perm contains shuffled indexes into the membership array
         p = perm[r]
-        # calculate cumulative sum of hits and misses at this index        
+        # calculate cumulative sum of hits and misses at this index
         # include weight from previous index
         if i == 0:
             phit[i] = 0
@@ -181,8 +181,8 @@ def random_walk(np.ndarray[FLOAT_t, ndim=1] weights_miss not None,
     # the enrichment score (ES) is the maximum deviation from zero of
     # phit - pmiss. for a randomly distributed S, ES(S) will be relatively
     # small, but if it is concentrated at the top or bottom of the list,
-    # or otherwise nonrandomly distributed, then ES(S) will be 
-    # correspondingly high   
+    # or otherwise nonrandomly distributed, then ES(S) will be
+    # correspondingly high
     last = nsamples - 1 # last index
     # if all weights equal to zero skip
     if (phit[last] > 0) or (pmiss[last] > 0):
@@ -203,7 +203,7 @@ def random_walk(np.ndarray[FLOAT_t, ndim=1] weights_miss not None,
                     es_val = es_run[i]
                     es_rank = i
     return es_val, es_rank, es_run
-      
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
@@ -213,7 +213,7 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
                 bint resample_counts,
                 bint permute_samples,
                 bint add_noise,
-                double noise_loc, 
+                double noise_loc,
                 double noise_scale,
                 int method_miss,
                 int method_hit,
@@ -226,10 +226,10 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
 
     cdef float es_val
     cdef int es_rank
-    cdef np.ndarray[FLOAT_t, ndim=1] es_run 
+    cdef np.ndarray[FLOAT_t, ndim=1] es_run
     # define constant values
     cdef int nsamples = counts.shape[0]
-    # normalize the counts 
+    # normalize the counts
     norm_counts = np.copy(counts)
 
     r.seed = c_normalize_counts(norm_counts, nsamples, size_factors, r.seed, resample_counts, add_noise, noise_loc, noise_scale);
@@ -239,7 +239,7 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
                      resample=resample_counts,
                      add_noise=add_noise,
                      noise_loc=noise_loc,
-                     noise_scale=noise_scale) 
+                     noise_scale=noise_scale)
     '''
 
     # perform power transform and adjust by constant
@@ -273,8 +273,8 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
     # perform random walk iteration
     es_run = np.copy(counts)
     es_val, es_rank, es_run = c_random_walk(norm_counts_miss, norm_counts_hit, membership.shape[0], es_run, membership, ranks, perm)
-    '''
 
+    '''
     es_val, es_rank, es_run = \
         random_walk(weights_miss=norm_counts_miss,
                     weights_hit=norm_counts_hit,
@@ -283,6 +283,5 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
                     perm=perm)
     '''
 
-
-    return (ranks, norm_counts, norm_counts_miss, norm_counts_hit, 
+    return (ranks, norm_counts, norm_counts_miss, norm_counts_hit,
             es_val, es_rank, es_run)

@@ -45,7 +45,7 @@ def main():
     bm = BigCountMatrix.from_tsv(tsv_file, output_dir,
                               na_values=na_values)
     logging.info("Estimating size factors")
-    bm.estimate_size_factors()
+    bm.estimate_size_factors('deseq')
     bm.close()
 
 if __name__ == '__main__':

@@ -362,18 +362,40 @@ class Metadata(object):
             metadata = dict(zip(header_fields,fields))
             yield Metadata(id_iter.next(), name, metadata)
 
+
 class Result(object):
-    MAX_POINTS = 100
-    FIELDS = ('t_id', 'rand_seed', 'es', 'es_rank', 'nominal_p_value',
-              'core_hits', 'core_misses', 'null_hits', 'null_misses',
-              'fisher_p_value', 'odds_ratio', 'nes', 'ss_fdr_q_value',
-              'ss_rank', 'ss_percentile', 'resample_es_vals',
-              'resample_es_ranks', 'null_es_vals', 'null_es_ranks',
-              'null_es_mean')
+    FIELDS = [('t_id', 'text primary key not null', None),
+              ('name', 'text', None),
+              ('rand_seed', 'bigint', None),
+              ('es', 'real', 0.0),
+              ('es_rank', 'integer', 0),
+              ('nominal_p_value', 'real', 1.0),
+              ('nes', 'real', 0.0),
+              ('fold_change', 'real', 0.0),
+              ('core_fold_change', 'real', 0.0),
+              ('core_hits', 'integer', 0),
+              ('core_misses', 'integer', 0),
+              ('null_hits', 'integer', 0),
+              ('null_misses', 'integer', 0),
+              ('fisher_p_value', 'real', 1.0),
+              ('odds_ratio', 'real', 1.0),
+              ('ss_fdr_q_value', 'real', 1.0),
+              ('ss_rank', 'integer', 0),
+              ('ss_frac', 'real', 0),
+              ('es_min', 'real', 0.0),
+              ('es_max', 'real', 0.0),
+              ('es_rank_min', 'integer', 0),
+              ('es_rank_max', 'integer', 0),
+              ('null_es_mean', 'real', 0),
+              ('null_es_min', 'real', 0.0),
+              ('null_es_max', 'real', 0.0),
+              ('null_es_rank_min', 'integer', 0),
+              ('null_es_rank_max', 'integer', 0)]
+    SQLITE_VALUES = '(' + ','.join('?' for x in xrange(len(FIELDS))) + ')'
 
     def __init__(self):
-        for x in Result.FIELDS:
-            setattr(self, x, None)
+        for f in Result.FIELDS:
+            setattr(self, f[0], f[2])
 
     def to_json(self):
         return json.dumps(self.__dict__, cls=NumpyJSONEncoder)
@@ -386,27 +408,13 @@ class Result(object):
         return res
 
     @staticmethod
-    def default():
-        '''setup a Result object with default (non-significant) values'''
-        res = Result()
-        res.t_id = None
-        res.rand_seed = None
-        res.es = 0.0
-        res.es_rank = 0
-        res.nominal_p_value = 1.0
-        res.core_hits = 0
-        res.core_misses = 0
-        res.null_hits = 0
-        res.null_misses = 0
-        res.fisher_p_value = 1.0
-        res.odds_ratio = 1.0
-        res.nes = 0.0
-        res.ss_fdr_q_value = 1.0
-        res.ss_rank = None
-        res.ss_frac = 0.0
-        res.resample_es_vals = np.zeros(Result.MAX_POINTS, dtype=np.float)
-        res.resample_es_ranks = np.zeros(Result.MAX_POINTS, dtype=np.float)
-        res.null_es_vals = np.zeros(Result.MAX_POINTS, dtype=np.float)
-        res.null_es_ranks = np.zeros(Result.MAX_POINTS, dtype=np.float)
-        res.null_es_mean = 0.0
-        return res
+    def sqlite_table(name):
+        s = ', '.join('{n} {t}'.format(n=f[0], t=f[1]) for f in Result.FIELDS)
+        return '''create table {n} ({s})'''.format(n=name, s=s)
+
+    @staticmethod
+    def sqlite_valstr():
+        return '(' + ','.join('?' for x in xrange(len(Result.FIELDS))) + ')'
+
+    def tuple(self):
+        return tuple(getattr(self, f[0]) for f in Result.FIELDS)
