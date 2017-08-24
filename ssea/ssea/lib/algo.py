@@ -32,7 +32,8 @@ KernelResult = namedtuple('KernelResult', ('ranks',
                                            'norm_counts_hit',
                                            'es_val',
                                            'es_rank',
-                                           'es_run'))
+                                           'es_run',
+                                           'perms'))
 
 # batch sort configuration
 SORT_BUFFER_SIZE = 32000
@@ -69,6 +70,79 @@ def _cmp_json_nes(line):
     res = Result.from_json(line.strip())
     return abs(res.nes)
 
+def ssea_kernel_debug(counts, size_factors, membership, rng, config):
+    '''
+    counts: numpy array of float values
+    size_factors: normalization factors for counts
+    membership: int array (0 or 1) with set membership
+    rng: RandomState object
+    config: Config object
+    '''
+    # run kernel to generate a range of observed enrichment scores
+    resample_rand_seeds = np.empty(config.resampling_iterations, dtype=np.int)
+    resample_count_ranks = np.empty((config.resampling_iterations, counts.shape[0]), dtype=np.int)
+    resample_es_vals = np.zeros(config.resampling_iterations, dtype=np.float)
+    resample_es_ranks = np.zeros(config.resampling_iterations, dtype=np.int)
+    # save random number generator seed before running kernel
+    resample_rand_seeds[0] = rng.seed
+    k = ssea_kernel(counts, size_factors, membership, rng,
+                    resample_counts=True,
+                    permute_samples=False,
+                    add_noise=True,
+                    noise_loc=config.noise_loc,
+                    noise_scale=config.noise_scale,
+                    method_miss=config.weight_miss,
+                    method_hit=config.weight_hit,
+                    method_param=config.weight_param)
+    k = KernelResult._make(k)
+    resample_count_ranks[0] = k.ranks
+    resample_es_vals[0] = k.es_val
+    resample_es_ranks[0] = k.es_rank
+
+def ssea_kernel_debug_run(config, sample_set, output_basename,
+                startrow=None, endrow=None):
+    '''
+    main SSEA loop (single processor)
+
+    config: Config object
+    sample_set: SampleSet object
+    output_basename: prefix for writing result files
+    '''
+    # initialize random number generator
+    rng = RandomState()
+    # open data matrix
+    bm = BigCountMatrix.open(config.matrix_dir)
+    # determine range of matrix to process
+    if startrow is None:
+        startrow = 0
+    if endrow is None:
+        endrow = bm.shape[0]
+    assert startrow < endrow
+    # get membership array for sample set
+    membership = sample_set.get_array(bm.colnames)
+    valid_samples = (membership >= 0)
+    # setup histograms
+    hists = _init_hists()
+    # setup report file
+    unsorted_json_file = output_basename + JSON_UNSORTED_SUFFIX
+    outfileh = open(unsorted_json_file, 'wb')
+    for i in xrange(startrow, endrow):
+        logging.debug("\tRow: %d (%d-%d)" % (i, startrow, endrow))
+        # read from memmap
+        counts = np.array(bm.counts[i,:], dtype=np.float)
+        # remove 'nan' values
+        valid_inds = np.logical_and(valid_samples, np.isfinite(counts))
+        # subset counts, size_factors, and membership array
+        counts = counts[valid_inds]
+        size_factors = bm.size_factors[valid_inds]
+        valid_membership = membership[valid_inds]
+        # write dummy results for invalid rows
+        if (valid_inds.sum() == 0) or (np.all(counts == 0)):
+            res = Result()
+        else:
+            # run ssea
+            ssea_kernel_debug(counts, size_factors, valid_membership, rng, config)
+        break
 
 def ssea_run(counts, size_factors, membership, rng, config):
     '''
@@ -94,7 +168,8 @@ def ssea_run(counts, size_factors, membership, rng, config):
                         noise_scale=config.noise_scale,
                         method_miss=config.weight_miss,
                         method_hit=config.weight_hit,
-                        method_param=config.weight_param)
+                        method_param=config.weight_param,
+                        median_center=config.median_center)
         k = KernelResult._make(k)
         resample_count_ranks[i] = k.ranks
         resample_es_vals[i] = k.es_val
@@ -130,7 +205,9 @@ def ssea_run(counts, size_factors, membership, rng, config):
     null_es_vals = np.zeros(config.perms, dtype=np.float)
     null_es_ranks = np.zeros(config.perms, dtype=np.float)
     i = 0
+    j = 0
     while i < config.perms:
+        j += 1
         k = ssea_kernel(counts, size_factors, membership, rng,
                         resample_counts=True,
                         permute_samples=True,
@@ -139,8 +216,18 @@ def ssea_run(counts, size_factors, membership, rng, config):
                         noise_scale=config.noise_scale,
                         method_miss=config.weight_miss,
                         method_hit=config.weight_hit,
-                        method_param=config.weight_param)
+                        method_param=config.weight_param,
+                        median_center=config.median_center)
         k = KernelResult._make(k)
+        # logging.debug('es_val: %f, es_sign: %d' % (k.es_val, es_sign))
+        # print 'ES SCORES', resample_es_vals
+        # print 'ESVAL', k.es_val, 'PVAL', k, k.es_rank
+        # print 'hi', k, k.es_rank
+        # if j > 1000:
+        #     null_es_vals[i] = 0.01 * es_sign
+        #     null_es_ranks[i] = 0.01 * es_sign
+        #     i += 1
+        # else:
         if cmp(k.es_val, 0) == es_sign:
             null_es_vals[i] = k.es_val
             null_es_ranks[i] = k.es_rank
@@ -332,7 +419,6 @@ def ssea_serial(config, sample_set, output_basename,
     os.remove(unsorted_json_file)
     logging.debug("Worker %s: done" % (output_basename))
     return 0
-
 
 def ssea_map(config, sample_set, worker_basenames, worker_chunks):
     '''

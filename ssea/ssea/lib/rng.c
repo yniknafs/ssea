@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include "rng.h"
 
 /* a.k.a. RAND_MAX */
 #define MODULUS ((1U << 31) - 1)
@@ -188,18 +189,29 @@ int main()
     int i;
     double d;
     int seed;
+    double sum = 0;
 
-    seed = lcg_init_state();
-    printf("seed is %d", seed);
+    for (int i = 0; i < 100; i++) {
+      // printf("sum:%d i:%d counts:%d \n ", sum, i, counts[i]);
+      printf("sum:%f \n ", sum);
+      sum += 1;
+    };
+    printf("%d", 4);
 
-    for (i = 0; i < 100; i++) {
-        seed = lcg_rand(seed);
-        d = lcg_poisson(&seed, 30);
-        /* d = ((double) seed) / MODULUS; */
-        printf("poisson %d %f\n", seed, d);
-        d = lcg_normal(&seed, 50, 2);
-        printf("normal %d %f\n", seed, d);
-    }
- 
+    // seed = lcg_init_state();
+    // printf("seed is %d\n", seed);
+    //
+    // for (i = 0; i < 10; i++) {
+    //     seed = lcg_rand(seed);
+    //     d = lcg_poisson(&seed, 30);
+    //     /* d = ((double) seed) / MODULUS; */
+    //     printf("poisson %d %f\n", seed, d);
+    //     d = lcg_normal(&seed, 50, 2);
+    //     printf("normal %d %f\n", seed, d);
+    //     d = lcg_double(&seed) * 1;
+    //     printf("double %d %f\n", seed, d);
+    // }
+
+
     return 0;
-} 
+}

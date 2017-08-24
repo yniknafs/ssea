@@ -77,7 +77,7 @@ class ReportGenerator:
     def close(self):
         self.bm.close()
 
-    def ssea_rerun(self, t_id, rand_seed=0):
+    def ssea_rerun(self, t_id, rand_seed=0, permute=False):
         sample_set = self.sample_set
         bm = self.bm
         args = self.args
@@ -93,20 +93,26 @@ class ReportGenerator:
         size_factors = bm.size_factors[valid_inds]
         membership = membership[valid_inds]
         # reproduce previous run
+        if permute:
+            rand_seed = 0
         rng = RandomState(rand_seed)
         (ranks, norm_counts, norm_counts_miss, norm_counts_hit,
-         es_val, es_rank, es_run) = \
+         es_val, es_rank, es_run, perm_ranks) = \
             ssea_kernel(counts, size_factors, membership, rng,
                         resample_counts=False,
-                        permute_samples=False,
+                        permute_samples=permute,
                         add_noise=True,
                         noise_loc=args.noise_loc,
                         noise_scale=args.noise_scale,
                         method_miss=args.weight_miss,
                         method_hit=args.weight_hit,
-                        method_param=args.weight_param)
+                        method_param=args.weight_param,
+                        median_center=args.median_center
+                        )
         # make object for plotting
-        m = membership[ranks]
+        app.logger.debug('Ranks: %s' % str(ranks))
+        app.logger.debug('Perm Ranks: %s' % str(perm_ranks))
+        m = membership[perm_ranks]
         hit_indexes = (m > 0).nonzero()[0]
         d = SSEAData()
         d.counts = counts
@@ -202,6 +208,7 @@ def data():
 @app.route('/ssea_plot')
 def ssea_plot():
     t_id = request.args.get('t_id')
+    perm = request.args.get('perm')
     app.logger.debug('TID' + str(t_id))
 
     # fetch results from database
@@ -214,7 +221,7 @@ def ssea_plot():
 
     # rerun ssea
     rg = app.config['REPORT_GENERATOR']
-    sseadata = rg.ssea_rerun(t_id, result['rand_seed'])
+    sseadata = rg.ssea_rerun(t_id, result['rand_seed'], permute=perm)
     app.logger.debug("RESULT "  + str(result['rand_seed']))
 
     # plot

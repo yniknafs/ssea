@@ -26,7 +26,7 @@ class Config(object):
     SAMPLE_SET_INFO_FILE = 'sample_sets.tsv'
     LOG_DIR = 'log'
     TMP_DIR = 'tmp'
-    
+
     def __init__(self):
         self.num_processes = 1
         self.output_dir = "SSEA_%s" % (timestamp())
@@ -50,14 +50,14 @@ class Config(object):
 
     def to_json(self):
         return json.dumps(self.__dict__)
-    
+
     @staticmethod
     def from_json(s):
         c = Config()
         d = json.loads(s)
         c.__dict__ = d
         return c
-    
+
     @staticmethod
     def from_dict(d):
         c = Config()
@@ -72,27 +72,27 @@ class Config(object):
 
     def get_argument_parser(self, parser=None):
         if parser is None:
-            parser = argparse.ArgumentParser()            
-        parser.add_argument("-v", "--verbose", dest="verbose", 
-                            action="store_true", default=False, 
+            parser = argparse.ArgumentParser()
+        parser.add_argument("-v", "--verbose", dest="verbose",
+                            action="store_true", default=False,
                             help="set verbosity level [default: %(default)s]")
         parser.add_argument('-p', '--num-processes', dest='num_processes',
                             type=int, default=1,
                             help='Number of processor cores available '
                             '[default=%(default)s]')
         grp = parser.add_argument_group('Output Options')
-        grp.add_argument('-o', '--output-dir', dest="output_dir", 
+        grp.add_argument('-o', '--output-dir', dest="output_dir",
                          help='Output directory [default=%(default)s]')
-        grp.add_argument('-a', '--append', dest="output_append", 
+        grp.add_argument('-a', '--append', dest="output_append",
                          action="store_true")
         grp = parser.add_argument_group('Cluster Computing Options')
         clustergrp = grp.add_mutually_exclusive_group()
-        clustergrp.add_argument('--cluster', dest='cluster', 
+        clustergrp.add_argument('--cluster', dest='cluster',
                                 action='store_const', const='setup',
                                 help='set to run SSEA on a cluster using PBS')
         clustergrp.add_argument('--cluster-map', dest='cluster',
                                 action='store_const', const='map',
-                                help='[for internal use only]') 
+                                help='[for internal use only]')
         clustergrp.add_argument('--cluster-reduce', dest='cluster',
                                 action='store_const', const='reduce',
                                 help='[for internal use only]')
@@ -105,16 +105,16 @@ class Config(object):
                          help='Number of permutations '
                          '[default=%(default)s]')
         grp.add_argument('--weight-miss', dest='weight_miss',
-                         choices=WEIGHT_METHODS.keys(), 
+                         choices=WEIGHT_METHODS.keys(),
                          default='log',
-                         help='Weighting method for elements not in set ' 
+                         help='Weighting method for elements not in set '
                          '[default=%(default)s]')
-        grp.add_argument('--weight-hit', dest='weight_hit', 
-                         choices=WEIGHT_METHODS.keys(), 
+        grp.add_argument('--weight-hit', dest='weight_hit',
+                         choices=WEIGHT_METHODS.keys(),
                          default='log',
                          help='Weighting method for elements in set '
                          '[default=%(default)s]')
-        grp.add_argument('--weight-param', dest='weight_param', type=float, 
+        grp.add_argument('--weight-param', dest='weight_param', type=float,
                          default=self.weight_param,
                          help='Either log2(n + X) for log transform or '
                          'pow(n,X) for exponential (root) transform '
@@ -133,7 +133,7 @@ class Config(object):
                          help='File(s) containing sets in row format')
         grp.add_argument('--json', dest='json_files', action='append',
                          help='File(s) containing sets in JSON format')
-        grp.add_argument('--matrix', dest='matrix_dir', default=None, 
+        grp.add_argument('--matrix', dest='matrix_dir', default=None,
                          help='Directory with binary memory-mapped count matrix files')
         return parser
 
@@ -168,8 +168,8 @@ class Config(object):
         # if in cluster mode only process relevant arguments
         if self.cluster is not None:
             if self.cluster != 'setup':
-                # when run in cluster map or reduce mode output dir points 
-                # to the specific sample set directory being processed 
+                # when run in cluster map or reduce mode output dir points
+                # to the specific sample set directory being processed
                 self.output_dir = args.output_dir
                 if not os.path.exists(self.output_dir):
                     parser.error("output directory '%s' not found by cluster map/reduce" % (self.output_dir))
@@ -184,7 +184,7 @@ class Config(object):
         self.output_dir = args.output_dir
         if self.output_dir is None:
             parser.error("Please specify an output directory using -o or --output-dir")
-        if (not self.output_append) and os.path.exists(self.output_dir):        
+        if (not self.output_append) and os.path.exists(self.output_dir):
             parser.error("Output directory '%s' already exists, run in "
                          "append mode (-a | --append) to add additional "
                          "sample sets to this output directory" % (args.output_dir))
@@ -193,13 +193,13 @@ class Config(object):
         self.perms = max(1, args.perms)
         # sample set size limits
         self.smin = max(1, args.smin)
-        self.smax = max(0, args.smax)        
+        self.smax = max(0, args.smax)
         # check weight methods
         if isinstance(args.weight_miss, basestring):
             self.weight_miss = WEIGHT_METHODS[args.weight_miss]
         if isinstance(args.weight_hit, basestring):
             self.weight_hit = WEIGHT_METHODS[args.weight_hit]
-        self.weight_param = args.weight_param        
+        self.weight_param = args.weight_param
         if self.weight_param < 0.0:
             parser.error('weight param < 0.0 invalid')
         elif ((self.weight_miss == 'log' or self.weight_hit == 'log')):

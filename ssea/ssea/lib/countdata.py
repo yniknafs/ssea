@@ -25,12 +25,12 @@ class BigCountMatrix(object):
     ROWNAMES_FILE = 'rownames.txt'
     COLNAMES_FILE = 'colnames.txt'
     SIZE_FACTORS_FILE = 'size_factors.txt'
-    LENGTHS_FILE = 'lengths.txt'
+    # LENGTHS_FILE = 'lengths.txt'
 
     def __init__(self):
         self.rownames = []
         self.colnames = []
-        self.lengths = []
+        # self.lengths = []
         self.counts = None
         self.counts_t = None
         self.size_factors = None
@@ -46,15 +46,15 @@ class BigCountMatrix(object):
         rownames_file = os.path.join(input_dir, BigCountMatrix.ROWNAMES_FILE)
         colnames_file = os.path.join(input_dir, BigCountMatrix.COLNAMES_FILE)
         size_factors_file = os.path.join(input_dir, BigCountMatrix.SIZE_FACTORS_FILE)
-        lengths_file = os.path.join(input_dir, BigCountMatrix.LENGTHS_FILE)
+        # lengths_file = os.path.join(input_dir, BigCountMatrix.LENGTHS_FILE)
         self = BigCountMatrix()
         self.matrix_dir = input_dir
         with open(rownames_file, 'r') as fileh:
             self.rownames = [line.strip() for line in fileh]
         with open(colnames_file, 'r') as fileh:
             self.colnames = [line.strip() for line in fileh]
-        with open(lengths_file, 'r') as fileh:
-            self.lengths = np.array([int(line.strip()) for line in fileh])
+        # with open(lengths_file, 'r') as fileh:
+        #     self.lengths = np.array([int(line.strip()) for line in fileh])
         with open(size_factors_file, 'r') as fileh:
             self.size_factors = np.array([float(line.strip()) for line in fileh])
         self.counts = np.memmap(counts_file, dtype=FLOAT_DTYPE, mode='r',
@@ -83,7 +83,7 @@ class BigCountMatrix(object):
         rownames_file = os.path.join(output_dir, BigCountMatrix.ROWNAMES_FILE)
         colnames_file = os.path.join(output_dir, BigCountMatrix.COLNAMES_FILE)
         size_factors_file = os.path.join(output_dir, BigCountMatrix.SIZE_FACTORS_FILE)
-        lengths_file = os.path.join(output_dir, BigCountMatrix.LENGTHS_FILE)
+        # lengths_file = os.path.join(output_dir, BigCountMatrix.LENGTHS_FILE)
         # write rownames and colnames
         with open(rownames_file, 'w') as fileh:
             row_inds = []
@@ -118,9 +118,9 @@ class BigCountMatrix(object):
             for ind in col_inds:
                 print >>fileh, self.size_factors[ind]
         # lengths
-        with open(lengths_file, 'w') as fileh:
-            for ind in row_inds:
-                print >>fileh, self.lengths[ind]
+        # with open(lengths_file, 'w') as fileh:
+        #     for ind in row_inds:
+        #         print >>fileh, self.lengths[ind]
 
     @staticmethod
     def from_tsv(input_file, output_dir, na_values=None):
@@ -142,18 +142,18 @@ class BigCountMatrix(object):
         counts_t_file = os.path.join(output_dir, BigCountMatrix.MEMMAP_T_FILE)
         rownames_file = os.path.join(output_dir, BigCountMatrix.ROWNAMES_FILE)
         colnames_file = os.path.join(output_dir, BigCountMatrix.COLNAMES_FILE)
-        lengths_file = os.path.join(output_dir, BigCountMatrix.LENGTHS_FILE)
+        # lengths_file = os.path.join(output_dir, BigCountMatrix.LENGTHS_FILE)
 
         self = BigCountMatrix()
         self.matrix_dir = output_dir
         # get rownames, colnames, and lengths
         with open(input_file, 'r') as fileh:
             header_fields = fileh.next().strip().split('\t')
-            self.colnames = list(header_fields[2:])
+            self.colnames = list(header_fields[1:])
             for line in fileh:
-                rowname, length = line.strip().split('\t', 2)[:2]
+                rowname = line.strip().split('\t')[0]
                 self.rownames.append(rowname)
-                self.lengths.append(int(length))
+                # self.lengths.append(int(length))
 
         # write rownames, colnames, and lengths
         with open(rownames_file, 'w') as fileh:
@@ -162,9 +162,9 @@ class BigCountMatrix(object):
         with open(colnames_file, 'w') as fileh:
             for colname in self.colnames:
                 print >>fileh, colname
-        with open(lengths_file, 'w') as fileh:
-            for length in self.lengths:
-                print >>fileh, str(length)
+        # with open(lengths_file, 'w') as fileh:
+        #     for length in self.lengths:
+        #         print >>fileh, str(length)
 
         # create memmap files
         self.counts = np.memmap(counts_file, dtype=FLOAT_DTYPE, mode='w+',
@@ -175,7 +175,7 @@ class BigCountMatrix(object):
                 fields = line.strip().split('\t')
                 # convert to floats and store
                 counts = [(np.nan if x in na_values else float(x))
-                          for x in fields[2:]]
+                          for x in fields[1:]]
                 self.counts[i,:] = counts
         # write transpose
         self.counts_t = np.memmap(counts_t_file, dtype=FLOAT_DTYPE, mode='w+',

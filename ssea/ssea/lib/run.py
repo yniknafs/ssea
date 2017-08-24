@@ -9,7 +9,7 @@ import shutil
 
 from base import WEIGHT_METHODS, ParserError, SampleSet, chunk
 from countdata import BigCountMatrix
-from algo import ssea_map, ssea_reduce
+from algo import ssea_map, ssea_reduce, ssea_kernel_debug_run
 
 
 __author__ = "Matthew Iyer, Yashar Niknafs"
@@ -31,6 +31,7 @@ class Args:
     OUTPUT_DIR = 'ssea_output'
     NUM_PERMUTATIONS = 1000
     RESAMPLING_ITERATIONS = 101
+    MEDIAN_CENTER_DEFAULT = True
     WEIGHT_MISS_DEFAULT = 'log'
     WEIGHT_HIT_DEFAULT = 'log'
     WEIGHT_PARAM = 1.0
@@ -69,6 +70,10 @@ class Args:
                             default=Args.NUM_PERMUTATIONS,
                             help='Number of permutations '
                             '[default=%(default)s]')
+        parser.add_argument('--no-median-center', dest='median_center',
+                         	default=Args.MEDIAN_CENTER_DEFAULT, action='store_false',
+                         	help='Transform data to log2(FC) over median for random walk'
+                         	'[default=%(default)s]')
         parser.add_argument('--weight-miss', dest='weight_miss',
                          	choices=WEIGHT_METHODS.keys(),
                          	default=Args.WEIGHT_MISS_DEFAULT,
@@ -215,6 +220,8 @@ class Run(object):
         sample_set = SampleSet.parse_smt(args.sample_set_file)[0]
         # ensure every sample found in count matrix
         if not set(sample_set.value_dict).issubset(cm.colnames):
+            logging.error(set(sample_set.value_dict) - set(cm.colnames))
+            logging.error(set(cm.colnames) - set(sample_set.value_dict))
             raise ParserError('samples in sample set do not match sample '
                               'names in count matrix')
         # sample sets must have at least one hit and one miss
@@ -280,6 +287,25 @@ class Run(object):
         ssea_reduce(worker_prefixes,
                     results.results_json_file,
                     results.hists_npz_file)
+
+        # cleanup
+        if os.path.exists(results.tmp_dir):
+            shutil.rmtree(results.tmp_dir)
+        logging.info('done')
+
+        return 0
+
+    def kernal_debug(self):
+        args = self.args
+        results = self.results
+        shape = self.cm.shape
+        sample_set = self.sample_set
+
+
+        # setup a set of parallel worker processes
+        # map step
+        logging.info("Running SSEA debug")
+        ssea_kernel_debug_run(args, sample_set, 'debug')
 
         # cleanup
         if os.path.exists(results.tmp_dir):

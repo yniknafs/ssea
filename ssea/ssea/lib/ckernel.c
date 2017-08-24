@@ -6,6 +6,62 @@
 
 long* base_norm_counts;
 
+void swap(double *p,double *q) {
+   double t;
+
+   t=*p;
+   *p=*q;
+   *q=t;
+}
+
+void sort(double a[],int n) {
+   int i,j,temp;
+
+   for(i=0;i<n-1;i++) {
+      for(j=0;j<n-i-1;j++) {
+         if(a[j]>a[j+1])
+            swap(&a[j],&a[j+1]);
+      }
+   }
+}
+
+static PyObject* py_median_center_counts(PyObject* self, PyObject* args) {
+
+    PyObject* counts_numpy_array;
+    PyObject* size_factors_numpy_array;
+    int counts_arraylen;
+    int random_seed_int;
+    int resample_flag;
+    int add_noise_flag;
+    double noise_loc;
+    double noise_scale;
+
+    if (!PyArg_ParseTuple(args, "OIOIIIdd", &counts_numpy_array, &counts_arraylen, &size_factors_numpy_array, &random_seed_int, &resample_flag, &add_noise_flag, &noise_loc, &noise_scale)) {
+        return NULL;
+    }
+
+    double* counts = (double*)PyArray_DATA(counts_numpy_array);
+
+
+    double counts_clone[counts_arraylen];
+    for(int i = 0; i < counts_arraylen; i++) {
+        counts_clone[i] = counts[i];
+    }
+
+    sort(counts_clone,counts_arraylen);
+    int n = (counts_arraylen+1) / 2 - 1;
+    double med = counts_clone[n];
+
+    double* size_factors = (double*)PyArray_DATA(size_factors_numpy_array);
+
+    for (int i = 0; i < counts_arraylen; i++) {
+          counts[i] = fabs(log2(counts[i]/med));
+        }
+
+
+    return Py_BuildValue("i", random_seed_int);
+}
+
 static PyObject* py_normalize_counts(PyObject* self, PyObject* args) {
 
     PyObject* counts_numpy_array;
@@ -22,6 +78,8 @@ static PyObject* py_normalize_counts(PyObject* self, PyObject* args) {
     }
 
     double* counts = (double*)PyArray_DATA(counts_numpy_array);
+
+
     double* size_factors = (double*)PyArray_DATA(size_factors_numpy_array);
 
     for (int i = 0; i < counts_arraylen; i++) {
@@ -36,6 +94,7 @@ static PyObject* py_normalize_counts(PyObject* self, PyObject* args) {
             counts[i] += lcg_double(&random_seed_int) * noise_scale;
         }
     }
+
 
     return Py_BuildValue("i", random_seed_int);
 }
@@ -135,7 +194,7 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
     long* perm = (long*)PyArray_DATA(perm_numpy_array);
 
     if (nsamples == 0) {
-        return Py_BuildValue("(f,I,O)", 0.0, 0, es_run_numpy_array); 
+        return Py_BuildValue("(f,I,O)", 0.0, 0, es_run_numpy_array);
     }
 
     double* phit = (double*)malloc(sizeof(double) * nsamples);
@@ -164,7 +223,7 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
     }
 
     const long last = nsamples - 1;
-    
+
     if ((phit[last] > 0) || (pmiss[last] > 0)) {
         if (phit[last] == 0) {
 
@@ -174,7 +233,7 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
                 es_run[i] = -1.0;
             }
 
-            return Py_BuildValue("(f,I,O)", -1.0, last, es_run_numpy_array); 
+            return Py_BuildValue("(f,I,O)", -1.0, last, es_run_numpy_array);
         } else if (pmiss[last] == 0) {
 
             free(phit);
@@ -183,7 +242,7 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
                 es_run[i] = 1.0;
             }
 
-            return Py_BuildValue("(f,I,O)", 1.0, 0, es_run_numpy_array); 
+            return Py_BuildValue("(f,I,O)", 1.0, 0, es_run_numpy_array);
         } else {
 
             float es_val = 0.0;
@@ -199,13 +258,13 @@ static PyObject* py_random_walk(PyObject* self, PyObject* args) {
 
             free(phit);
             free(pmiss);
-            return Py_BuildValue("(f,I,O)", es_val, es_rank, es_run_numpy_array); 
+            return Py_BuildValue("(f,I,O)", es_val, es_rank, es_run_numpy_array);
         }
     }
 
     free(phit);
     free(pmiss);
-    return Py_BuildValue("(f,I,O)", 0.0, 0, es_run_numpy_array); 
+    return Py_BuildValue("(f,I,O)", 0.0, 0, es_run_numpy_array);
 }
 
 static int reverse_argsort_compare(const void* a, const void* b) {
@@ -245,6 +304,7 @@ static PyMethodDef CCkernelMethods[] = {
     {"c_shufflei", py_shufflei, METH_VARARGS},
     {"c_random_walk", py_random_walk, METH_VARARGS},
     {"c_argsort", py_argsort, METH_VARARGS},
+    {"c_median_center_counts", py_median_center_counts, METH_VARARGS},
     {NULL, NULL}
 };
 
@@ -254,4 +314,3 @@ initckernel(void)
     (void) Py_InitModule("ckernel", CCkernelMethods);
     import_array();
 }
-

@@ -15,7 +15,7 @@ cimport rng
 from libc.math cimport log2, fabs
 
 # C kernel import
-from ckernel import c_normalize_counts, c_argsort, c_power_transform, c_shufflei, c_random_walk
+from ckernel import c_normalize_counts, c_argsort, c_power_transform, c_shufflei, c_random_walk, c_median_center_counts
 
 # define power transform methods
 DEF UNWEIGHTED = 0
@@ -217,7 +217,8 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
                 double noise_scale,
                 int method_miss,
                 int method_hit,
-                double method_param):
+                double method_param,
+                bint median_center):
     cdef np.ndarray[INT_t, ndim=1] perm
     cdef np.ndarray[INT_t, ndim=1] ranks
     cdef np.ndarray[FLOAT_t, ndim=1] norm_counts
@@ -244,13 +245,7 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
 
     # perform power transform and adjust by constant
     if (method_param == None):
-        method_param = 1.0
-
-    norm_counts_miss = np.copy(norm_counts);
-    norm_counts_hit = np.copy(norm_counts);
-
-    c_power_transform(norm_counts, norm_counts.shape[0], norm_counts_miss, method_miss, method_param, UNWEIGHTED, WEIGHTED, EXP, LOG)
-    c_power_transform(norm_counts, norm_counts.shape[0], norm_counts_hit, method_hit, method_param, UNWEIGHTED, WEIGHTED, EXP, LOG)
+        method_param = 1.0;
 
     '''
     norm_counts_miss = power_transform(norm_counts, method_miss, method_param)
@@ -263,16 +258,29 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
 
     # This is faster than the "qsort" C implementation
     ranks = np.copy(np.argsort(norm_counts)[::-1])
+
+    if median_center:
+      r.seed = c_median_center_counts(norm_counts, nsamples, size_factors, r.seed, resample_counts, add_noise, noise_loc, noise_scale);
+
+    norm_counts_miss = np.copy(norm_counts);
+    norm_counts_hit = np.copy(norm_counts);
+
+    c_power_transform(norm_counts, norm_counts.shape[0], norm_counts_miss, method_miss, method_param, UNWEIGHTED, WEIGHTED, EXP, LOG);
+    c_power_transform(norm_counts, norm_counts.shape[0], norm_counts_hit, method_hit, method_param, UNWEIGHTED, WEIGHTED, EXP, LOG);
+
+
     perm = np.arange(nsamples)
 
     if permute_samples:
-        # randomize order to walk through samples
-        r.seed = c_shufflei(perm, perm.shape[0], r.seed);
-        #shufflei(perm, r)
+          # randomize order to walk through samples
+          r.seed = c_shufflei(perm, perm.shape[0], r.seed);
+          #shufflei(perm, r)
 
     # perform random walk iteration
     es_run = np.copy(counts)
     es_val, es_rank, es_run = c_random_walk(norm_counts_miss, norm_counts_hit, membership.shape[0], es_run, membership, ranks, perm)
+
+    perm_rank = perm[ranks]
 
     '''
     es_val, es_rank, es_run = \
@@ -284,4 +292,4 @@ def ssea_kernel(np.ndarray[FLOAT_t, ndim=1] counts not None,
     '''
 
     return (ranks, norm_counts, norm_counts_miss, norm_counts_hit,
-            es_val, es_rank, es_run)
+            es_val, es_rank, es_run, perm_rank)

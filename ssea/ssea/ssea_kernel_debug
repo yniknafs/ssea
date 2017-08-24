@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+'''
+SSEA: Sample Set Enrichment Analysis
+'''
+import sys
+import logging
+
+from ssea.lib.run import Run
+
+__author__ = "Matthew Iyer, Yashar Niknafs"
+__copyright__ = "Copyright 2012-2017"
+__credits__ = ["Matthew Iyer", "Yashar Niknafs"]
+__license__ = "GPL"
+__version__ = "0.1.0"
+__maintainer__ = "Yashar Niknafs"
+__email__ = "yniknafs@umich.edu"
+__status__ = "Development"
+
+PROFILE = False
+PROFILE_FILENAME = 'ssea.prof'
+
+
+def main():
+    # instantiate from command line
+    R = Run.create()
+    R.log_args()
+    return R.kernal_debug()
+
+
+if __name__ == '__main__':
+    if PROFILE:
+        import cProfile
+        sys.exit(cProfile.run('main()', filename=PROFILE_FILENAME))
+    else:
+        return_value = main()
+        if (return_value != 0):
+            sys.exit(return_value)

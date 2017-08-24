@@ -79,6 +79,7 @@
       ]
     });
 
+
     // Add event listener for opening and closing details
     $('#table-ssea tbody').on('click', 'td.details-control', function () {
       var tr = $(this).closest('tr');
@@ -88,8 +89,13 @@
         row.child.hide();
         tr.removeClass('shown');
       } else {
+
         // Open this row
-        row.child("<img src='/ssea_plot?t_id=" + row.data().t_id + "'/>").show();
+        dom = "<br><br><img src='/ssea_plot?t_id=" + row.data().t_id + "'/>" +
+              "<br>" +
+              "<img src='/ssea_plot?t_id=" + row.data().t_id + "&perm=True'/>"
+
+        row.child(dom).show();
         tr.addClass('shown');
       }
     });
