@@ -7,6 +7,7 @@
 
 /* a.k.a. RAND_MAX */
 #define MODULUS ((1U << 31) - 1)
+#define M_PI 3.14159265358979323846264338327
 
 /* seed generator using time */
 int lcg_init_state()
