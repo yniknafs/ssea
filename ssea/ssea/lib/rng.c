@@ -186,17 +186,17 @@ double lcg_uniform(int *seedp, double loc, double scale)
 
 int main()
 {
-    int i;
-    double d;
-    int seed;
-    double sum = 0;
-
-    for (int i = 0; i < 100; i++) {
-      // printf("sum:%d i:%d counts:%d \n ", sum, i, counts[i]);
-      printf("sum:%f \n ", sum);
-      sum += 1;
-    };
-    printf("%d", 4);
+    // int i;
+    // double d;
+    // int seed;
+    // double sum = 0;
+    //
+    // for (int i = 0; i < 100; i++) {
+    //   // printf("sum:%d i:%d counts:%d \n ", sum, i, counts[i]);
+    //   printf("sum:%f \n ", sum);
+    //   sum += 1;
+    // };
+    // printf("%d", 4);
 
     // seed = lcg_init_state();
     // printf("seed is %d\n", seed);
