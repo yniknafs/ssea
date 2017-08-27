@@ -32,9 +32,8 @@ ext_modules = [Extension('ssea.lib.kernel',
 extensions = [
     Extension('ssea.lib.ckernel',
               sources=['ssea/lib/ckernel.c', 'ssea/lib/rng.c'],
-              extra_compile_args=['-w'],
-              include_dirs=[numpy_inc],
-              extra_compile_args=['-std=c99']
+              extra_compile_args=['-w', '-std=c99'],
+              include_dirs=[numpy_inc]
              )
 ]
 
