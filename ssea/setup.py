@@ -22,10 +22,12 @@ __status__ = "Development"
 ext_modules = [Extension('ssea.lib.kernel',
                          sources=['ssea/lib/kernel.pyx', 'ssea/lib/rng.c'],
                          include_dirs=[numpy_inc],
-                         libraries=['m']),
+                         libraries=['m'],
+                         extra_compile_args=['-std=c99']),
                Extension('ssea.lib.cfisher',
                          sources=['ssea/lib/cfisher.pyx'],
-                         include_dirs=[numpy_inc])]
+                         include_dirs=[numpy_inc],
+                         extra_compile_args=['-std=c99']))]
 
 extensions = [
     Extension('ssea.lib.ckernel',
