@@ -27,7 +27,7 @@ ext_modules = [Extension('ssea.lib.kernel',
                Extension('ssea.lib.cfisher',
                          sources=['ssea/lib/cfisher.pyx'],
                          include_dirs=[numpy_inc],
-                         extra_compile_args=['-std=c99']))]
+                         extra_compile_args=['-std=c99'])]
 
 extensions = [
     Extension('ssea.lib.ckernel',
