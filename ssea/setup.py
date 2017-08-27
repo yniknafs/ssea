@@ -33,7 +33,8 @@ extensions = [
     Extension('ssea.lib.ckernel',
               sources=['ssea/lib/ckernel.c', 'ssea/lib/rng.c'],
               extra_compile_args=['-w'],
-              include_dirs=[numpy_inc]
+              include_dirs=[numpy_inc],
+              extra_compile_args=['-std=c99']
              )
 ]
 
