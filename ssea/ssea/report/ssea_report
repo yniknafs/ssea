@@ -57,11 +57,14 @@ class SSEAData:
 
 
 class ReportGenerator:
-    def __init__(self, input_dir):
+    def __init__(self, input_dir, matrix_dir):
         self.results = Results(input_dir)
         self.args = Args.load(self.results.args_file)
         self.sample_set = SampleSet.parse_json(self.results.sample_set_json_file)[0]
-        self.bm = BigCountMatrix.open(self.args.matrix_dir)
+        if matrix_dir:
+            self.bm = BigCountMatrix.open(matrix_dir)
+        else:
+            self.bm = BigCountMatrix.open(self.args.matrix_dir)
         self.lib_sizes = self._get_library_sizes()
 
     def _get_library_sizes(self):
@@ -153,9 +156,11 @@ def start(app):
     # parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('input_dir')
+    parser.add_argument('--matrix_dir', default=False,
+        help='Specify different matrix directory. Default is to use the same matrix as was used for running SSEA')
     args = parser.parse_args()
     # load ssea results
-    rg = ReportGenerator(args.input_dir)
+    rg = ReportGenerator(args.input_dir, args.matrix_dir)
     results_json_file = rg.results.results_json_file
     app.config['REPORT_GENERATOR'] = rg
     # wipe database
