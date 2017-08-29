@@ -299,8 +299,9 @@ def ssea_run(counts, size_factors, membership, rng, config):
     core_hits_mean = norm_counts[m_core_hits].mean() if core_hits > 0 else 0.0
     hits_mean = norm_counts[m_hits].mean() if num_hits > 0 else 0.0
     misses_mean = norm_counts[m_misses].mean() if num_misses > 0 else 1.0
-    core_fold_change = core_hits_mean / misses_mean
-    fold_change = hits_mean / misses_mean
+    core_fold_change = np.log2((core_hits_mean + 1e-5 )/ (misses_mean + 1e-5))
+    fold_change = np.log2((hits_mean + 1e-5) /( misses_mean + 1e-5))
+
 
     # fisher exact test (one-sided hypothesis that LE is enriched)
     fisher_p_value = fisher.pvalue(core_hits, core_misses, null_hits, null_misses).right_tail
@@ -562,3 +563,18 @@ def ssea_reduce(input_basenames, output_json_file, output_hist_file):
         json_file = input_basenames[i] + JSON_SORTED_SUFFIX
         os.remove(json_file)
     return 0
+
+def parse_results(filename):
+    with open(filename, 'r') as fp:
+        for line in fp:
+            result = Result.from_json(line.strip())
+            yield result
+
+def print_tsv(input_json_file, output_tsv_file):
+    headero = ['id', 'log2FC', 'log2FC_le', 'es', 'nes', 'pval', 'fdr', 'percentile']
+    with open(output_tsv_file, 'wb', 64*1024) as f:
+        print >>f, '\t'.join(headero)
+        for r in parse_results(input_json_file):
+            lineo = [r.name, r.fold_change, r.core_fold_change, r.es,
+                    r.nes, r.nominal_p_value, r.ss_fdr_q_value, r.ss_frac]
+            print >>f, '\t'.join(map(str,lineo))

@@ -9,7 +9,7 @@ import shutil
 
 from base import WEIGHT_METHODS, ParserError, SampleSet, chunk
 from countdata import BigCountMatrix
-from algo import ssea_map, ssea_reduce, ssea_kernel_debug_run
+from algo import ssea_map, ssea_reduce, ssea_kernel_debug_run, print_tsv
 
 
 __author__ = "Matthew Iyer, Yashar Niknafs"
@@ -178,6 +178,7 @@ class Results(object):
     ARGS_FILE = 'args.pickle'
     SAMPLE_SET_JSON_FILE = 'sample_set.json'
     RESULTS_JSON_FILE = 'results.json'
+    RESULTS_TSV_FILE = 'results.tsv'
     HISTS_NPZ_FILE = 'hists.npz'
 
     def __init__(self, output_dir):
@@ -187,6 +188,7 @@ class Results(object):
         self.args_file = os.path.join(output_dir, Results.ARGS_FILE)
         self.sample_set_json_file = os.path.join(output_dir, Results.SAMPLE_SET_JSON_FILE)
         self.results_json_file = os.path.join(output_dir, Results.RESULTS_JSON_FILE)
+        self.results_tsv_file = os.path.join(output_dir, Results.RESULTS_TSV_FILE)
         self.hists_npz_file = os.path.join(output_dir, Results.HISTS_NPZ_FILE)
 
 
@@ -287,6 +289,9 @@ class Run(object):
         ssea_reduce(worker_prefixes,
                     results.results_json_file,
                     results.hists_npz_file)
+
+        logging.info("Printing results file to: %s" % results.results_tsv_file)
+        print_tsv(results.results_json_file, results.results_tsv_file)
 
         # cleanup
         if os.path.exists(results.tmp_dir):
